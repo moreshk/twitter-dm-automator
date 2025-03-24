@@ -177,12 +177,56 @@ def process_replies(page):
                         if stats['followersNum'] >= 10000 and stats['dmOpen'] and stats['notFollowing']:
                             print(f"🎯 High Value Target! 🎯")
                             print(f"✨ {stats['followers']} followers with open DMs ✨")
+                            
+                            # Click DM button and send message
+                            try:
+                                print("Opening DM...")
+                                random_delay(2, 4)  # Natural delay before clicking
+                                
+                                # Click the DM button and wait for modal
+                                profile_page.click('[data-testid="sendDMFromProfile"]')
+                                print("Waiting for DM modal...")
+                                profile_page.wait_for_selector('[data-testid="dmComposerTextInput"]', timeout=10000)
+                                random_delay(3, 5)  # Wait for DM modal to fully load
+                                
+                                # Type message using keyboard input instead of direct value setting
+                                print("Typing message...")
+                                profile_page.type('[data-testid="dmComposerTextInput"]', 'gm', delay=100)  # Slow typing
+                                random_delay(2, 4)  # Natural delay after typing
+                                
+                                # Wait for and click the send button
+                                print("Sending message...")
+                                send_button = profile_page.wait_for_selector('[data-testid="dmComposerSendButton"]:not([disabled])', timeout=10000)
+                                if send_button:
+                                    send_button.click()
+                                    print("Sent DM: 'gm'")
+                                    random_delay(3, 5)  # Wait for send to complete
+                                
+                                    # Wait for and click close button
+                                    print("Closing DM modal...")
+                                    close_button = profile_page.wait_for_selector('[aria-label="Close"]', timeout=10000)
+                                    if close_button:
+                                        close_button.click()
+                                        random_delay(2, 4)
+                                    else:
+                                        print("No close button found, continuing...")
+                                else:
+                                    print("Send button not enabled, skipping...")
+                                    
+                            except Exception as e:
+                                print(f"Error sending DM: {e}")
+                                # Try to close the DM modal if it's still open
+                                try:
+                                    profile_page.click('[aria-label="Close"]')
+                                    random_delay(2, 3)
+                                except:
+                                    print("Could not close DM modal")
                         
                         # Close profile tab and return to post
                         print("Closing profile tab...")
                         profile_page.close()
-                        random_delay(1, 2)
-                        
+                        random_delay(2, 4)
+                    
                     except Exception as e:
                         print(f"Error processing user profile: {e}")
                         try:
