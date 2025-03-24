@@ -5,7 +5,7 @@ import random
 
 load_dotenv()
 
-def random_delay(min_seconds=1, max_seconds=3):
+def random_delay(min_seconds=2, max_seconds=4):
     """Add random delay to make actions look more human"""
     time.sleep(random.uniform(min_seconds, max_seconds))
 
@@ -50,7 +50,9 @@ def process_replies(page):
                         
                         # Get user stats
                         stats = profile_page.evaluate('''
-                            () => {
+                            (async () => {
+                                const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+                                
                                 const getCount = () => {
                                     const followerSpan = Array.from(document.querySelectorAll('span')).find(
                                         span => span.textContent === 'Followers'
@@ -72,13 +74,49 @@ def process_replies(page):
                                 };
                                 
                                 const getMutuals = () => {
-                                    const elements = document.querySelectorAll('span');
-                                    for (const elem of elements) {
-                                        if (elem.textContent.includes('Followed by')) {
-                                            return elem.textContent;
-                                        }
+                                    // Try different selectors to find the mutual followers text
+                                    const selectors = [
+                                        'div[style*="color: rgb(113, 118, 123)"]',
+                                        'div.css-146c3p1',
+                                        'div[dir="ltr"]'
+                                    ];
+                                    
+                                    let mutualDiv = null;
+                                    for (const selector of selectors) {
+                                        const divs = document.querySelectorAll(selector);
+                                        mutualDiv = Array.from(divs).find(div => 
+                                            div.textContent.includes('Followed by') || 
+                                            div.textContent.includes('others you follow')
+                                        );
+                                        if (mutualDiv) break;
                                     }
-                                    return 'No mutuals';
+                                    
+                                    if (!mutualDiv) {
+                                        console.log('No mutual div found'); // Debug
+                                        return 'No mutual followers';
+                                    }
+                                    
+                                    const text = mutualDiv.textContent;
+                                    console.log('Found mutual text:', text); // Debug
+                                    
+                                    if (text.includes('Followed by')) {
+                                        // Extract the number of others
+                                        const othersMatch = text.match(/(\d+) others? you follow/);
+                                        const othersCount = othersMatch ? parseInt(othersMatch[1]) : 0;
+                                        
+                                        // Count named followers
+                                        const namedCount = text.split('Followed by ')[1]
+                                            .split(' and ')[0]
+                                            .split(', ')
+                                            .length;
+                                            
+                                        const totalCount = namedCount + othersCount;
+                                        console.log(`Named: ${namedCount}, Others: ${othersCount}, Total: ${totalCount}`); // Debug
+                                        
+                                        return `${totalCount} mutual followers`;
+                                    }
+                                    
+                                    return 'No mutual followers';
                                 };
                                 
                                 const hasDMButton = () => {
@@ -86,13 +124,16 @@ def process_replies(page):
                                 };
                                 
                                 const isNotFollowing = () => {
-                                    // Check for the presence of a "Follow" button and absence of "Following" button
                                     const followButton = document.querySelector('[data-testid$="-follow"]');
                                     const followingButton = document.querySelector('[data-testid$="-unfollow"]');
                                     return followButton && !followingButton;
                                 };
                                 
+                                // Add delays between operations
+                                await sleep(Math.random() * 2000 + 2000); // 2-4s delay
                                 const followers = getCount();
+                                
+                                await sleep(Math.random() * 2000 + 2000); // 2-4s delay
                                 const followersNum = (() => {
                                     const text = followers.toLowerCase();
                                     const num = parseFloat(text.replace(/,/g, ''));
@@ -104,14 +145,23 @@ def process_replies(page):
                                     return num;
                                 })();
                                 
+                                await sleep(Math.random() * 2000 + 2000); // 2-4s delay
+                                const mutuals = getMutuals();
+                                
+                                await sleep(Math.random() * 2000 + 2000); // 2-4s delay
+                                const dmOpen = hasDMButton();
+                                
+                                await sleep(Math.random() * 2000 + 2000); // 2-4s delay
+                                const notFollowing = isNotFollowing();
+                                
                                 return {
                                     followers,
                                     followersNum,
-                                    mutuals: getMutuals(),
-                                    dmOpen: hasDMButton(),
-                                    notFollowing: isNotFollowing()
+                                    mutuals,
+                                    dmOpen,
+                                    notFollowing
                                 };
-                            }
+                            })()
                         ''')
                         
                         # Clean up username to get handle only
