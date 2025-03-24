@@ -52,18 +52,14 @@ def process_replies(page):
                         stats = profile_page.evaluate('''
                             () => {
                                 const getCount = () => {
-                                    // First find the Followers text element
                                     const followerSpan = Array.from(document.querySelectorAll('span')).find(
                                         span => span.textContent === 'Followers'
                                     );
                                     
                                     if (followerSpan) {
-                                        // Navigate up to find the anchor tag containing both number and text
                                         const anchor = followerSpan.closest('a');
                                         if (anchor) {
-                                            // Get all spans within this anchor
                                             const spans = anchor.querySelectorAll('span');
-                                            // Find the span containing the number (usually comes before "Followers")
                                             for (const span of spans) {
                                                 const text = span.textContent;
                                                 if (text && text !== 'Followers' && /^[\d,.KkMm]+$/.test(text.trim())) {
@@ -85,16 +81,34 @@ def process_replies(page):
                                     return 'No mutuals';
                                 };
                                 
+                                const hasDMButton = () => {
+                                    return !!document.querySelector('[data-testid="sendDMFromProfile"]');
+                                };
+                                
+                                const followers = getCount();
+                                const followersNum = parseFloat(followers.replace(/[kK]/, '000').replace(/[mM]/, '000000').replace(/,/g, ''));
+                                
                                 return {
-                                    followers: getCount(),
-                                    mutuals: getMutuals()
+                                    followers,
+                                    followersNum,
+                                    mutuals: getMutuals(),
+                                    dmOpen: hasDMButton()
                                 };
                             }
                         ''')
                         
-                        print(f"Username: {reply['username']} {' 🔵' if reply['isVerified'] else ''}")
+                        # Clean up username to get handle only
+                        handle = reply['username'].split('@')[-1].split('·')[0].strip()
+                        
+                        print(f"Username: @{handle} {' 🔵' if reply['isVerified'] else ''}")
                         print(f"Followers: {stats['followers']}")
+                        print(f"DMs: {'🔓 Open' if stats['dmOpen'] else '🔒 Closed'}")
                         print(f"Mutuals: {stats['mutuals']}")
+                        
+                        # Check if user has >10K followers and open DMs
+                        if stats['followersNum'] >= 10000 and stats['dmOpen']:
+                            print(f"🎯 High Value Target! 🎯")
+                            print(f"✨ {stats['followers']} followers with open DMs ✨")
                         
                         # Close profile tab and return to post
                         print("Closing profile tab...")
