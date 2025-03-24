@@ -23,25 +23,17 @@ def process_replies(page):
                     const usernameElement = reply.querySelector('[data-testid="User-Name"]');
                     const verifiedBadge = reply.querySelector('[data-testid="icon-verified"]');
                     
-                    // Get followers and following counts
-                    const userCell = reply.closest('[data-testid="cellInnerDiv"]');
-                    const getUserMetric = (text) => {
-                        const elements = userCell?.querySelectorAll('span');
-                        for (const elem of elements || []) {
-                            if (elem.textContent.includes(text)) {
-                                const count = elem.textContent.split(' ')[0];
-                                return count;
-                            }
-                        }
-                        return '0';
+                    const getMetric = (testId) => {
+                        const element = reply.querySelector(`[data-testid="${testId}"]`);
+                        return element ? element.textContent : '0';
                     };
                     
                     return {
                         id: reply.getAttribute('aria-labelledby'),
                         username: usernameElement ? usernameElement.textContent : null,
                         isVerified: !!verifiedBadge,
-                        followers: getUserMetric('Followers'),
-                        following: getUserMetric('Following')
+                        likes: getMetric('like'),
+                        retweets: getMetric('retweet')
                     };
                 });
             }
@@ -56,8 +48,8 @@ def process_replies(page):
                 if reply['username']:
                     print("\nReply from:")
                     print(f"Username: {reply['username']} {' 🔵' if reply['isVerified'] else ''}")
-                    print(f"Followers: {reply['followers']}")
-                    print(f"Following: {reply['following']}")
+                    print(f"Likes: {reply['likes']}")
+                    print(f"Retweets: {reply['retweets']}")
                 
                 random_delay(1, 2)
         
@@ -173,7 +165,7 @@ def main():
                                 retweets = int(post['retweets'].replace(',', '')) if post['retweets'].replace(',', '').isdigit() else 0
                                 replies = int(post['replies'].replace(',', '')) if post['replies'].replace(',', '').isdigit() else 0
                                 
-                                if replies >= 50:
+                                if replies >= 20:
                                     print("\n🔥 High Engagement Post Found! (20+ replies) 🔥")
                                     if post['link']:
                                         try:
