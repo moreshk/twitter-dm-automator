@@ -1,7 +1,9 @@
 from playwright.sync_api import sync_playwright
 import os
+import sys
 from dotenv import load_dotenv
 import time
+import traceback
 
 load_dotenv()
 
@@ -155,6 +157,81 @@ def main():
                                     # Wait for people results to appear
                                     page.wait_for_selector('[data-testid="cellInnerDiv"]', timeout=10000)
                                     print("People results loaded")
+
+                                    # Wait a moment for the results to stabilize
+                                    time.sleep(2)
+
+                                    # Find the first profile
+                                    try:
+                                        # Look for the first profile link
+                                        profile_selectors = [
+                                            '[data-testid="cellInnerDiv"] a[role="link"]',  # General profile cell link
+                                            'a[role="link"][href*="/"]',  # Profile links
+                                            'a[href*="/"]:has-text("@")'  # Links containing @ symbol
+                                        ]
+
+                                        profile_link = None
+                                        for selector in profile_selectors:
+                                            try:
+                                                profile_link = page.wait_for_selector(selector, timeout=5000)
+                                                if profile_link:
+                                                    print(f"Found profile link with selector: {selector}")
+                                                    break
+                                            except Exception:
+                                                continue
+
+                                        if profile_link:
+                                            # Get the href attribute
+                                            href = profile_link.get_attribute('href')
+                                            print(f"Profile URL: {href}")
+
+                                            try:
+                                                # Get base URL and construct full profile URL
+                                                base_url = page.url.split('/search')[0]  # Get base URL
+                                                full_url = base_url + href
+                                                print(f"Opening URL: {full_url}")
+
+                                                # Create new tab and navigate to profile
+                                                new_page = page.context.new_page()
+                                                new_page.goto(full_url)
+                                                print("Navigated to profile in new tab")
+
+                                                # Wait for profile page to load
+                                                time.sleep(2)
+                                                
+                                                # Check for DM button with exact criteria
+                                                try:
+                                                    # Look for button with both aria-label="Message" and data-testid="sendDMFromProfile"
+                                                    dm_button = new_page.query_selector(
+                                                        'button[aria-label="Message"][data-testid="sendDMFromProfile"]'
+                                                    )
+                                                    
+                                                    if dm_button:
+                                                        print("DMs are open - Found message button")
+                                                    else:
+                                                        print("DMs are closed - No message button found")
+                                                        # Close the current tab
+                                                        new_page.close()
+                                                        print("Closed profile tab")
+                                                        
+                                                        # Switch back to original tab
+                                                        page.bring_to_front()
+                                                        print("Switched back to search results")
+                                                        
+                                                except Exception as e:
+                                                    print(f"Error checking DM status: {e}")
+                                                    traceback.print_exc()
+                                                    
+                                            except Exception as e:
+                                                print(f"Error opening profile in new tab: {e}")
+                                                traceback.print_exc()
+                                        else:
+                                            print("Could not find any profile links")
+                                            
+                                    except Exception as profile_error:
+                                        print(f"Error while trying to open profile: {profile_error}")
+                                        traceback.print_exc()
+                                    
                                     break
                             except Exception as tab_error:
                                 print(f"Selector {selector} failed: {tab_error}")
@@ -177,7 +254,6 @@ def main():
             input('Press Enter to close connection...')
         except Exception as e:
             print(f"Error occurred: {e}")
-            import traceback
             traceback.print_exc()
         finally:
             browser.close()
