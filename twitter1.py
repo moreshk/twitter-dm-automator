@@ -5,9 +5,85 @@ import random
 
 load_dotenv()
 
-def random_delay(min_seconds=1, max_seconds=2):
+def random_delay(min_seconds=1, max_seconds=3):
     """Add random delay to make actions look more human"""
     time.sleep(random.uniform(min_seconds, max_seconds))
+
+def process_replies(page):
+    """Process all replies in a post"""
+    print("\nAnalyzing replies...")
+    processed_replies = set()
+    
+    while True:
+        # Get all reply tweets
+        replies = page.evaluate('''
+            () => {
+                const replies = Array.from(document.querySelectorAll('article'));
+                return replies.map(reply => {
+                    const usernameElement = reply.querySelector('[data-testid="User-Name"]');
+                    const verifiedBadge = reply.querySelector('[data-testid="icon-verified"]');
+                    
+                    // Get followers and following counts
+                    const userCell = reply.closest('[data-testid="cellInnerDiv"]');
+                    const getUserMetric = (text) => {
+                        const elements = userCell?.querySelectorAll('span');
+                        for (const elem of elements || []) {
+                            if (elem.textContent.includes(text)) {
+                                const count = elem.textContent.split(' ')[0];
+                                return count;
+                            }
+                        }
+                        return '0';
+                    };
+                    
+                    return {
+                        id: reply.getAttribute('aria-labelledby'),
+                        username: usernameElement ? usernameElement.textContent : null,
+                        isVerified: !!verifiedBadge,
+                        followers: getUserMetric('Followers'),
+                        following: getUserMetric('Following')
+                    };
+                });
+            }
+        ''')
+        
+        new_replies = False
+        for reply in replies:
+            if reply['id'] and reply['id'] not in processed_replies:
+                new_replies = True
+                processed_replies.add(reply['id'])
+                
+                if reply['username']:
+                    print("\nReply from:")
+                    print(f"Username: {reply['username']} {' 🔵' if reply['isVerified'] else ''}")
+                    print(f"Followers: {reply['followers']}")
+                    print(f"Following: {reply['following']}")
+                
+                random_delay(1, 2)
+        
+        if not new_replies:
+            # Scroll down to load more replies
+            page.evaluate("window.scrollBy(0, 800)")
+            random_delay(2, 3)
+            
+            # Check if we've reached the end (look for "Show more replies" button)
+            show_more = page.query_selector('span:has-text("Show more replies")')
+            if show_more:
+                try:
+                    show_more.click()
+                    random_delay(2, 3)
+                except:
+                    break
+            else:
+                # Check if we're truly at the end
+                previous_height = page.evaluate("document.body.scrollHeight")
+                page.evaluate("window.scrollBy(0, 800)")
+                random_delay(2, 3)
+                new_height = page.evaluate("document.body.scrollHeight")
+                
+                if new_height == previous_height:
+                    print("\nReached end of replies")
+                    break
 
 def main():
     with sync_playwright() as p:
@@ -98,22 +174,39 @@ def main():
                                 replies = int(post['replies'].replace(',', '')) if post['replies'].replace(',', '').isdigit() else 0
                                 
                                 if replies >= 50:
-                                    print("\n🔥 High Engagement Post Found! (50+ replies) 🔥")
+                                    print("\n🔥 High Engagement Post Found! (20+ replies) 🔥")
                                     if post['link']:
                                         try:
                                             print(f"Opening viral post in new tab...")
                                             new_page = page.context.new_page()
                                             new_page.goto(post['link'])
                                             print(f"Opened: {post['link']}")
+                                            random_delay(2, 3)
+                                            
+                                            # Process replies in the new tab
+                                            process_replies(new_page)
+                                            
+                                            # Close the tab after processing
+                                            print("Closing reply tab...")
+                                            new_page.close()
                                             random_delay(1, 2)
+                                            
+                                            # Switch back to main tab
+                                            page.bring_to_front()
+                                            
                                         except Exception as e:
-                                            print(f"Error opening viral post: {e}")
+                                            print(f"Error processing viral post: {e}")
+                                            try:
+                                                new_page.close()
+                                                page.bring_to_front()
+                                            except:
+                                                pass
                                 else:
                                     print("\nNew Post Details:")
                                     
                                 print(f"Username: {post['username']}")
                                 print(f"Content: {post['content']}")
-                                print(f"Replies: {post['replies']} {'💬' if replies >= 50 else ''}")
+                                print(f"Replies: {post['replies']} {'💬' if replies >= 20 else ''}")
                                 print(f"Retweets: {post['retweets']}")
                                 print(f"Likes: {post['likes']}")
                                 print(f"Views: {post['views']}")
