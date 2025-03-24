@@ -86,7 +86,10 @@ def process_replies(page):
                                 };
                                 
                                 const isNotFollowing = () => {
-                                    return !!document.querySelector('[data-testid$="-follow"]');
+                                    // Check for the presence of a "Follow" button and absence of "Following" button
+                                    const followButton = document.querySelector('[data-testid$="-follow"]');
+                                    const followingButton = document.querySelector('[data-testid$="-unfollow"]');
+                                    return followButton && !followingButton;
                                 };
                                 
                                 const followers = getCount();
