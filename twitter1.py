@@ -166,8 +166,8 @@ def process_replies(page):
                         
                         # Clean up username to get handle only
                         handle = reply['username'].split('@')[-1].split('·')[0].strip()
-                        # Get profile name (everything before @)
-                        profile_name = reply['username'].split('@')[0].strip()
+                        # Get profile name (just first word before any spaces)
+                        profile_name = reply['username'].split('@')[0].strip().split()[0]
                         
                         print(f"Username: @{handle} {' 🔵' if reply['isVerified'] else ''}")
                         print(f"Followers: {stats['followers']} ({stats['followersNum']:,.0f})")
@@ -180,7 +180,6 @@ def process_replies(page):
                             print(f"🎯 High Value Target! 🎯")
                             print(f"✨ {stats['followers']} followers with open DMs ✨")
                             
-                            # Click DM button and send message
                             try:
                                 print("Opening DM...")
                                 random_delay(2, 4)  # Natural delay before clicking
@@ -204,30 +203,23 @@ we're a new social launcher where you can tag us to launch tokens directly on th
 
 hope you can check us out"""
                                 
-                                # Click the DM button and wait for modal
+                                # Click the DM button and wait for input
                                 profile_page.click('[data-testid="sendDMFromProfile"]')
-                                print("Waiting for DM modal...")
                                 profile_page.wait_for_selector('[data-testid="dmComposerTextInput"]', timeout=10000)
-                                random_delay(3, 5)  # Wait for DM modal to fully load
+                                random_delay(2, 4)
                                 
-                                # Type message using keyboard input instead of direct value setting
-                                print("Typing message...")
-                                profile_page.type('[data-testid="dmComposerTextInput"]', message, delay=100)  # Slow typing
-                                random_delay(2, 4)  # Natural delay after typing
+                                # Type message
+                                profile_page.type('[data-testid="dmComposerTextInput"]', message, delay=100)
+                                random_delay(2, 3)
                                 
-                                # Wait for and click the send button
-                                print("Sending message...")
-                                send_button = profile_page.wait_for_selector('[data-testid="dmComposerSendButton"]:not([disabled])', timeout=10000)
-                                if send_button:
-                                    send_button.click()
-                                    print(f"Sent DM to {profile_name}:")
-                                    print(message)
-                                    random_delay(3, 5)  # Wait for send to complete
-                                else:
-                                    print("Send button not enabled, skipping...")
-                                    
+                                # Click send and wait for completion
+                                profile_page.click('[data-testid="dmComposerSendButton"]')
+                                print(f"Sent DM to {profile_name}:")
+                                print(message)
+                                random_delay(4, 6)  # Longer delay after sending before closing
+                                
                             except Exception as e:
-                                print(f"Error sending DM: {e}")
+                                print(f"Error in DM process: {e}")
                         
                         # Close profile tab and return to post
                         print("Closing profile tab...")
