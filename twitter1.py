@@ -86,7 +86,16 @@ def process_replies(page):
                                 };
                                 
                                 const followers = getCount();
-                                const followersNum = parseFloat(followers.replace(/[kK]/, '000').replace(/[mM]/, '000000').replace(/,/g, ''));
+                                const followersNum = (() => {
+                                    const text = followers.toLowerCase();
+                                    const num = parseFloat(text.replace(/,/g, ''));
+                                    if (text.includes('k')) {
+                                        return num * 1000;
+                                    } else if (text.includes('m')) {
+                                        return num * 1000000;
+                                    }
+                                    return num;
+                                })();
                                 
                                 return {
                                     followers,
@@ -101,7 +110,7 @@ def process_replies(page):
                         handle = reply['username'].split('@')[-1].split('·')[0].strip()
                         
                         print(f"Username: @{handle} {' 🔵' if reply['isVerified'] else ''}")
-                        print(f"Followers: {stats['followers']}")
+                        print(f"Followers: {stats['followers']} ({stats['followersNum']:,.0f})")
                         print(f"DMs: {'🔓 Open' if stats['dmOpen'] else '🔒 Closed'}")
                         print(f"Mutuals: {stats['mutuals']}")
                         
