@@ -25,28 +25,29 @@ def main():
             page.goto('https://twitter.com')
             random_delay()
 
-            # Wait for and click the Following tab
-            following_selectors = [
-                'a[href="/following"]',
-                'a[href*="/following"]',
-                'span:has-text("Following")',
-                '[role="link"]:has-text("Following")'
+            # Wait for and click the For you tab
+            for_you_selectors = [
+                'a[href="/home"]',
+                'a[href*="/home"]',
+                'span:has-text("For you")',
+                '[role="tab"]:has-text("For you")',
+                '[role="link"]:has-text("For you")'
             ]
             
-            following_tab = None
-            for selector in following_selectors:
+            for_you_tab = None
+            for selector in for_you_selectors:
                 try:
-                    following_tab = page.wait_for_selector(selector, state='visible', timeout=5000)
-                    if following_tab:
-                        print("Found Following tab")
-                        following_tab.click()
-                        print("Clicked Following tab")
+                    for_you_tab = page.wait_for_selector(selector, state='visible', timeout=5000)
+                    if for_you_tab:
+                        print("Found For you tab")
+                        for_you_tab.click()
+                        print("Clicked For you tab")
                         break
                 except Exception:
                     continue
 
-            if not following_tab:
-                print("Could not find Following tab")
+            if not for_you_tab:
+                print("Could not find For you tab")
             else:
                 # Wait for posts to load
                 print("Waiting for posts to load...")
@@ -90,12 +91,20 @@ def main():
                                 new_posts = True
                                 processed_posts.add(post['id'])
                                 
-                                print("\nNew Post Details:")
+                                # Convert metrics to integers
+                                likes = int(post['likes'].replace(',', '')) if post['likes'].replace(',', '').isdigit() else 0
+                                retweets = int(post['retweets'].replace(',', '')) if post['retweets'].replace(',', '').isdigit() else 0
+                                
+                                if likes > 20 or retweets > 20:
+                                    print("\n🔥 Viral Post Found! 🔥")
+                                else:
+                                    print("\nNew Post Details:")
+                                    
                                 print(f"Username: {post['username']}")
                                 print(f"Content: {post['content']}")
                                 print(f"Replies: {post['replies']}")
-                                print(f"Retweets: {post['retweets']}")
-                                print(f"Likes: {post['likes']}")
+                                print(f"Retweets: {post['retweets']} {'⭐' if retweets > 20 else ''}")
+                                print(f"Likes: {post['likes']} {'⭐' if likes > 20 else ''}")
                                 print(f"Views: {post['views']}")
                                 
                                 random_delay(1, 2)  # Delay between processing posts
