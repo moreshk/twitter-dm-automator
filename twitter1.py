@@ -22,18 +22,13 @@ def process_replies(page):
                 return replies.map(reply => {
                     const usernameElement = reply.querySelector('[data-testid="User-Name"]');
                     const verifiedBadge = reply.querySelector('[data-testid="icon-verified"]');
-                    
-                    const getMetric = (testId) => {
-                        const element = reply.querySelector(`[data-testid="${testId}"]`);
-                        return element ? element.textContent : '0';
-                    };
+                    const userLink = reply.querySelector('[data-testid="User-Name"] a');
                     
                     return {
                         id: reply.getAttribute('aria-labelledby'),
                         username: usernameElement ? usernameElement.textContent : null,
                         isVerified: !!verifiedBadge,
-                        likes: getMetric('like'),
-                        retweets: getMetric('retweet')
+                        profileUrl: userLink ? userLink.href : null
                     };
                 });
             }
@@ -45,13 +40,75 @@ def process_replies(page):
                 new_replies = True
                 processed_replies.add(reply['id'])
                 
-                if reply['username']:
-                    print("\nReply from:")
-                    print(f"Username: {reply['username']} {' 🔵' if reply['isVerified'] else ''}")
-                    print(f"Likes: {reply['likes']}")
-                    print(f"Retweets: {reply['retweets']}")
-                
-                random_delay(1, 2)
+                if reply['username'] and reply['profileUrl']:
+                    try:
+                        # Open user profile in new tab
+                        print(f"\nOpening profile for: {reply['username']}")
+                        profile_page = page.context.new_page()
+                        profile_page.goto(reply['profileUrl'])
+                        random_delay(2, 3)
+                        
+                        # Get user stats
+                        stats = profile_page.evaluate('''
+                            () => {
+                                const getCount = () => {
+                                    // First find the Followers text element
+                                    const followerSpan = Array.from(document.querySelectorAll('span')).find(
+                                        span => span.textContent === 'Followers'
+                                    );
+                                    
+                                    if (followerSpan) {
+                                        // Navigate up to find the anchor tag containing both number and text
+                                        const anchor = followerSpan.closest('a');
+                                        if (anchor) {
+                                            // Get all spans within this anchor
+                                            const spans = anchor.querySelectorAll('span');
+                                            // Find the span containing the number (usually comes before "Followers")
+                                            for (const span of spans) {
+                                                const text = span.textContent;
+                                                if (text && text !== 'Followers' && /^[\d,.KkMm]+$/.test(text.trim())) {
+                                                    return text;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    return '0';
+                                };
+                                
+                                const getMutuals = () => {
+                                    const elements = document.querySelectorAll('span');
+                                    for (const elem of elements) {
+                                        if (elem.textContent.includes('Followed by')) {
+                                            return elem.textContent;
+                                        }
+                                    }
+                                    return 'No mutuals';
+                                };
+                                
+                                return {
+                                    followers: getCount(),
+                                    mutuals: getMutuals()
+                                };
+                            }
+                        ''')
+                        
+                        print(f"Username: {reply['username']} {' 🔵' if reply['isVerified'] else ''}")
+                        print(f"Followers: {stats['followers']}")
+                        print(f"Mutuals: {stats['mutuals']}")
+                        
+                        # Close profile tab and return to post
+                        print("Closing profile tab...")
+                        profile_page.close()
+                        random_delay(1, 2)
+                        
+                    except Exception as e:
+                        print(f"Error processing user profile: {e}")
+                        try:
+                            profile_page.close()
+                        except:
+                            pass
+                    
+                    random_delay(1, 2)
         
         if not new_replies:
             # Scroll down to load more replies
