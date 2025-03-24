@@ -85,6 +85,10 @@ def process_replies(page):
                                     return !!document.querySelector('[data-testid="sendDMFromProfile"]');
                                 };
                                 
+                                const isNotFollowing = () => {
+                                    return !!document.querySelector('[data-testid$="-follow"]');
+                                };
+                                
                                 const followers = getCount();
                                 const followersNum = (() => {
                                     const text = followers.toLowerCase();
@@ -101,7 +105,8 @@ def process_replies(page):
                                     followers,
                                     followersNum,
                                     mutuals: getMutuals(),
-                                    dmOpen: hasDMButton()
+                                    dmOpen: hasDMButton(),
+                                    notFollowing: isNotFollowing()
                                 };
                             }
                         ''')
@@ -112,10 +117,11 @@ def process_replies(page):
                         print(f"Username: @{handle} {' 🔵' if reply['isVerified'] else ''}")
                         print(f"Followers: {stats['followers']} ({stats['followersNum']:,.0f})")
                         print(f"DMs: {'🔓 Open' if stats['dmOpen'] else '🔒 Closed'}")
+                        print(f"Following: {'❌ No' if stats['notFollowing'] else '✅ Yes'}")
                         print(f"Mutuals: {stats['mutuals']}")
                         
-                        # Check if user has >10K followers and open DMs
-                        if stats['followersNum'] >= 10000 and stats['dmOpen']:
+                        # Check if user has >10K followers, open DMs, and we're not following them
+                        if stats['followersNum'] >= 10000 and stats['dmOpen'] and stats['notFollowing']:
                             print(f"🎯 High Value Target! 🎯")
                             print(f"✨ {stats['followers']} followers with open DMs ✨")
                         
