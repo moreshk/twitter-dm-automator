@@ -78,7 +78,8 @@ def main():
                                         replies: getMetric('reply'),
                                         retweets: getMetric('retweet'),
                                         likes: getMetric('like'),
-                                        views: article.querySelector('[data-testid="analytics"]')?.textContent || '0'
+                                        views: article.querySelector('[data-testid="analytics"]')?.textContent || '0',
+                                        link: article.querySelector('a[href*="/status/"]')?.href || null
                                     };
                                 });
                             }
@@ -94,17 +95,27 @@ def main():
                                 # Convert metrics to integers
                                 likes = int(post['likes'].replace(',', '')) if post['likes'].replace(',', '').isdigit() else 0
                                 retweets = int(post['retweets'].replace(',', '')) if post['retweets'].replace(',', '').isdigit() else 0
+                                replies = int(post['replies'].replace(',', '')) if post['replies'].replace(',', '').isdigit() else 0
                                 
-                                if likes > 20 or retweets > 20:
-                                    print("\n🔥 Viral Post Found! 🔥")
+                                if replies >= 50:
+                                    print("\n🔥 High Engagement Post Found! (50+ replies) 🔥")
+                                    if post['link']:
+                                        try:
+                                            print(f"Opening viral post in new tab...")
+                                            new_page = page.context.new_page()
+                                            new_page.goto(post['link'])
+                                            print(f"Opened: {post['link']}")
+                                            random_delay(1, 2)
+                                        except Exception as e:
+                                            print(f"Error opening viral post: {e}")
                                 else:
                                     print("\nNew Post Details:")
                                     
                                 print(f"Username: {post['username']}")
                                 print(f"Content: {post['content']}")
-                                print(f"Replies: {post['replies']}")
-                                print(f"Retweets: {post['retweets']} {'⭐' if retweets > 20 else ''}")
-                                print(f"Likes: {post['likes']} {'⭐' if likes > 20 else ''}")
+                                print(f"Replies: {post['replies']} {'💬' if replies >= 50 else ''}")
+                                print(f"Retweets: {post['retweets']}")
+                                print(f"Likes: {post['likes']}")
                                 print(f"Views: {post['views']}")
                                 
                                 random_delay(1, 2)  # Delay between processing posts
