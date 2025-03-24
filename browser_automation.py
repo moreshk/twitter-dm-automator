@@ -128,18 +128,35 @@ def process_profile_list(page):
                     
                     # Check followers count
                     try:
-                        # Wait for the followers stats to load
-                        random_delay(1, 2)
+                        # Wait for profile content to load
+                        random_delay(2, 3)
                         
-                        # Look for the followers count using a more specific selector
-                        followers_stats = new_page.query_selector('a[href$="/followers"] span:not(:has-text("Followers"))')
+                        # Find the Followers link and get its parent container
+                        followers_link = new_page.evaluate('''
+                            () => {
+                                const spans = document.querySelectorAll('span');
+                                for (const span of spans) {
+                                    if (span.textContent === 'Followers') {
+                                        const link = span.closest('a');
+                                        if (link) {
+                                            const spans = link.querySelectorAll('span');
+                                            for (const s of spans) {
+                                                const text = s.textContent;
+                                                if (text && text !== 'Followers' && /^[\d,.KkMm]+$/.test(text.trim())) {
+                                                    return text.trim();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                return null;
+                            }
+                        ''')
                         
-                        if followers_stats:
-                            followers_count_text = followers_stats.inner_text()
-                            print(f"Raw followers text: {followers_count_text}")
-                            
-                            followers_count = convert_followers_count(followers_count_text)
-                            print(f"Followers count: {followers_count_text} ({followers_count:,.0f})")
+                        if followers_link:
+                            print(f"Raw followers text: {followers_link}")
+                            followers_count = convert_followers_count(followers_link)
+                            print(f"Followers count: {followers_link} ({followers_count:,.0f})")
                             
                             if followers_count >= 10000:
                                 print("✅ More than 10K followers - keeping tab open")
@@ -148,22 +165,6 @@ def process_profile_list(page):
                                 print("❌ Less than 10K followers - closing tab")
                         else:
                             print("❌ Couldn't find followers count")
-                            # Try alternative selector if the first one fails
-                            alt_followers = new_page.query_selector('a[href*="/followers"] span[data-testid="app-text-transition-container"]')
-                            if alt_followers:
-                                followers_count_text = alt_followers.inner_text()
-                                print(f"Found followers using alternative method: {followers_count_text}")
-                                
-                                followers_count = convert_followers_count(followers_count_text)
-                                print(f"Followers count: {followers_count_text} ({followers_count:,.0f})")
-                                
-                                if followers_count >= 10000:
-                                    print("✅ More than 10K followers - keeping tab open")
-                                    keep_tab = True
-                                else:
-                                    print("❌ Less than 10K followers - closing tab")
-                            else:
-                                print("❌ Couldn't find followers count with alternative method")
                             
                     except Exception as e:
                         print(f"Error checking followers count: {e}")
