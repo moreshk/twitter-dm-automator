@@ -166,6 +166,8 @@ def process_replies(page):
                         
                         # Clean up username to get handle only
                         handle = reply['username'].split('@')[-1].split('·')[0].strip()
+                        # Get profile name (everything before @)
+                        profile_name = reply['username'].split('@')[0].strip()
                         
                         print(f"Username: @{handle} {' 🔵' if reply['isVerified'] else ''}")
                         print(f"Followers: {stats['followers']} ({stats['followersNum']:,.0f})")
@@ -183,6 +185,25 @@ def process_replies(page):
                                 print("Opening DM...")
                                 random_delay(2, 4)  # Natural delay before clicking
                                 
+                                # Prepare message based on follower count
+                                message = ""
+                                if stats['followersNum'] >= 20000:
+                                    message = f"""gm {profile_name}
+
+we're a new social launcher where you can tag us to launch tokens directly on the TL and earn 50% of the fees
+
+got a prop for you:
+tag us to launch a token on your TL
+we'll give you 100% of the fees from your token
++ a heads up prior to our platform token launching
+can we collab?"""
+                                else:
+                                    message = f"""gm {profile_name}
+
+we're a new social launcher where you can tag us to launch tokens directly on the TL and earn 50% of the fees
+
+hope you can check us out"""
+                                
                                 # Click the DM button and wait for modal
                                 profile_page.click('[data-testid="sendDMFromProfile"]')
                                 print("Waiting for DM modal...")
@@ -191,7 +212,7 @@ def process_replies(page):
                                 
                                 # Type message using keyboard input instead of direct value setting
                                 print("Typing message...")
-                                profile_page.type('[data-testid="dmComposerTextInput"]', 'gm', delay=100)  # Slow typing
+                                profile_page.type('[data-testid="dmComposerTextInput"]', message, delay=100)  # Slow typing
                                 random_delay(2, 4)  # Natural delay after typing
                                 
                                 # Wait for and click the send button
@@ -199,28 +220,14 @@ def process_replies(page):
                                 send_button = profile_page.wait_for_selector('[data-testid="dmComposerSendButton"]:not([disabled])', timeout=10000)
                                 if send_button:
                                     send_button.click()
-                                    print("Sent DM: 'gm'")
+                                    print(f"Sent DM to {profile_name}:")
+                                    print(message)
                                     random_delay(3, 5)  # Wait for send to complete
-                                
-                                    # Wait for and click close button
-                                    print("Closing DM modal...")
-                                    close_button = profile_page.wait_for_selector('[aria-label="Close"]', timeout=10000)
-                                    if close_button:
-                                        close_button.click()
-                                        random_delay(2, 4)
-                                    else:
-                                        print("No close button found, continuing...")
                                 else:
                                     print("Send button not enabled, skipping...")
                                     
                             except Exception as e:
                                 print(f"Error sending DM: {e}")
-                                # Try to close the DM modal if it's still open
-                                try:
-                                    profile_page.click('[aria-label="Close"]')
-                                    random_delay(2, 3)
-                                except:
-                                    print("Could not close DM modal")
                         
                         # Close profile tab and return to post
                         print("Closing profile tab...")
