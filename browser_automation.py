@@ -4,8 +4,11 @@ import sys
 from dotenv import load_dotenv
 import time
 import traceback
+import random
 
 load_dotenv()
+
+processed_profiles = set()  # Keep track of processed profile URLs
 
 class BrowserContext:
     def __init__(self, page):
@@ -47,6 +50,161 @@ class ElementTree:
                 'selector': f'[{idx}]<{element_type}>{element_text}</{element_type}>'
             })
         return indexed_elements
+
+def random_delay(min_seconds=2, max_seconds=4):
+    """Add random delay to make actions look more human"""
+    time.sleep(random.uniform(min_seconds, max_seconds))
+
+def convert_followers_count(text):
+    """Convert followers text to number"""
+    try:
+        text = text.strip().lower()
+        if 'k' in text:
+            return float(text.replace('k', '')) * 1000
+        elif 'm' in text:
+            return float(text.replace('m', '')) * 1000000
+        else:
+            return float(text.replace(',', ''))
+    except Exception as e:
+        print(f"Error converting followers count '{text}': {e}")
+        return 0
+
+def is_valid_profile_url(href):
+    """Check if URL is a valid profile URL"""
+    invalid_patterns = ['hashtag', 'search?q=', 'src=', 'f=user']
+    return href and not any(pattern in href for pattern in invalid_patterns)
+
+def process_profile_list(page):
+    while True:
+        # Wait for profile cells to be visible
+        page.wait_for_selector('[data-testid="cellInnerDiv"]', timeout=10000)
+        random_delay(2, 3)
+        
+        # Get all profile cells
+        profile_cells = page.query_selector_all('[data-testid="cellInnerDiv"]')
+        print(f"\nFound {len(profile_cells)} profile cells in current view")
+        
+        processed_any = False
+        
+        for cell in profile_cells:
+            try:
+                # Find the main profile link within the cell
+                profile_link = cell.query_selector('a[role="link"]')
+                if not profile_link:
+                    continue
+                
+                href = profile_link.get_attribute('href')
+                if not href or not is_valid_profile_url(href) or href in processed_profiles:
+                    continue
+                
+                processed_any = True
+                print(f"\nProcessing new profile: {href}")
+                processed_profiles.add(href)
+                
+                # Random delay before opening profile
+                random_delay(2, 4)
+                
+                # Get base URL and construct full profile URL
+                base_url = page.url.split('/search')[0]
+                full_url = base_url + href
+                print(f"Opening URL: {full_url}")
+
+                # Create new tab and navigate to profile
+                new_page = page.context.new_page()
+                new_page.goto(full_url)
+                print("Navigated to profile in new tab")
+
+                # Wait for profile content to load
+                random_delay(3, 5)
+                
+                # Check for DM button
+                dm_button = new_page.query_selector(
+                    'button[aria-label="Message"][data-testid="sendDMFromProfile"]'
+                )
+                
+                keep_tab = False
+                if dm_button:
+                    print("DMs are open - Found message button")
+                    
+                    # Check followers count
+                    try:
+                        # Wait for the followers stats to load
+                        random_delay(1, 2)
+                        
+                        # Look for the followers count using a more specific selector
+                        followers_stats = new_page.query_selector('a[href$="/followers"] span:not(:has-text("Followers"))')
+                        
+                        if followers_stats:
+                            followers_count_text = followers_stats.inner_text()
+                            print(f"Raw followers text: {followers_count_text}")
+                            
+                            followers_count = convert_followers_count(followers_count_text)
+                            print(f"Followers count: {followers_count_text} ({followers_count:,.0f})")
+                            
+                            if followers_count >= 10000:
+                                print("✅ More than 10K followers - keeping tab open")
+                                keep_tab = True
+                            else:
+                                print("❌ Less than 10K followers - closing tab")
+                        else:
+                            print("❌ Couldn't find followers count")
+                            # Try alternative selector if the first one fails
+                            alt_followers = new_page.query_selector('a[href*="/followers"] span[data-testid="app-text-transition-container"]')
+                            if alt_followers:
+                                followers_count_text = alt_followers.inner_text()
+                                print(f"Found followers using alternative method: {followers_count_text}")
+                                
+                                followers_count = convert_followers_count(followers_count_text)
+                                print(f"Followers count: {followers_count_text} ({followers_count:,.0f})")
+                                
+                                if followers_count >= 10000:
+                                    print("✅ More than 10K followers - keeping tab open")
+                                    keep_tab = True
+                                else:
+                                    print("❌ Less than 10K followers - closing tab")
+                            else:
+                                print("❌ Couldn't find followers count with alternative method")
+                            
+                    except Exception as e:
+                        print(f"Error checking followers count: {e}")
+                        traceback.print_exc()
+                else:
+                    print("❌ DMs are closed - closing tab")
+                
+                # Handle tab management
+                random_delay(1, 2)
+                if not keep_tab:
+                    new_page.close()
+                    print("Closed profile tab")
+                else:
+                    print("Kept profile tab open")
+                
+                # Switch back to original tab
+                page.bring_to_front()
+                print("Switched back to search results")
+                random_delay(2, 3)
+                
+                # Break after processing one profile
+                break
+                
+            except Exception as e:
+                print(f"Error processing profile: {e}")
+                traceback.print_exc()
+        
+        # If we didn't process any new profiles, try scrolling
+        if not processed_any:
+            previous_height = page.evaluate("document.body.scrollHeight")
+            page.evaluate("window.scrollBy(0, 300)")  # Scroll less aggressively
+            random_delay(2, 3)
+            
+            new_height = page.evaluate("document.body.scrollHeight")
+            if new_height == previous_height:
+                print("\nReached end of list - no more new profiles to load")
+                break
+            else:
+                print("\nScrolled to load more profiles...")
+                random_delay(1, 2)
+                continue
 
 def main():
     with sync_playwright() as p:
@@ -161,76 +319,10 @@ def main():
                                     # Wait a moment for the results to stabilize
                                     time.sleep(2)
 
-                                    # Find the first profile
-                                    try:
-                                        # Look for the first profile link
-                                        profile_selectors = [
-                                            '[data-testid="cellInnerDiv"] a[role="link"]',  # General profile cell link
-                                            'a[role="link"][href*="/"]',  # Profile links
-                                            'a[href*="/"]:has-text("@")'  # Links containing @ symbol
-                                        ]
-
-                                        profile_link = None
-                                        for selector in profile_selectors:
-                                            try:
-                                                profile_link = page.wait_for_selector(selector, timeout=5000)
-                                                if profile_link:
-                                                    print(f"Found profile link with selector: {selector}")
-                                                    break
-                                            except Exception:
-                                                continue
-
-                                        if profile_link:
-                                            # Get the href attribute
-                                            href = profile_link.get_attribute('href')
-                                            print(f"Profile URL: {href}")
-
-                                            try:
-                                                # Get base URL and construct full profile URL
-                                                base_url = page.url.split('/search')[0]  # Get base URL
-                                                full_url = base_url + href
-                                                print(f"Opening URL: {full_url}")
-
-                                                # Create new tab and navigate to profile
-                                                new_page = page.context.new_page()
-                                                new_page.goto(full_url)
-                                                print("Navigated to profile in new tab")
-
-                                                # Wait for profile page to load
-                                                time.sleep(2)
-                                                
-                                                # Check for DM button with exact criteria
-                                                try:
-                                                    # Look for button with both aria-label="Message" and data-testid="sendDMFromProfile"
-                                                    dm_button = new_page.query_selector(
-                                                        'button[aria-label="Message"][data-testid="sendDMFromProfile"]'
-                                                    )
-                                                    
-                                                    if dm_button:
-                                                        print("DMs are open - Found message button")
-                                                    else:
-                                                        print("DMs are closed - No message button found")
-                                                        # Close the current tab
-                                                        new_page.close()
-                                                        print("Closed profile tab")
-                                                        
-                                                        # Switch back to original tab
-                                                        page.bring_to_front()
-                                                        print("Switched back to search results")
-                                                        
-                                                except Exception as e:
-                                                    print(f"Error checking DM status: {e}")
-                                                    traceback.print_exc()
-                                                    
-                                            except Exception as e:
-                                                print(f"Error opening profile in new tab: {e}")
-                                                traceback.print_exc()
-                                        else:
-                                            print("Could not find any profile links")
-                                            
-                                    except Exception as profile_error:
-                                        print(f"Error while trying to open profile: {profile_error}")
-                                        traceback.print_exc()
+                                    # After clicking People tab and waiting for results
+                                    print("Starting to process profiles...")
+                                    random_delay(2, 3)
+                                    process_profile_list(page)
                                     
                                     break
                             except Exception as tab_error:
