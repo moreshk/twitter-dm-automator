@@ -120,11 +120,59 @@ def main():
                 # Press Enter
                 search_box.press('Enter')
 
-                # Wait for search results
-                page.wait_for_load_state('networkidle')
-                print("Search completed successfully.")
-            else:
-                print("Search box not found after all attempts.")
+                # Instead of waiting for networkidle, let's wait for specific elements
+                print("Waiting for search results...")
+                
+                # Wait for the navigation tabs to appear
+                try:
+                    # First wait for the tabs container
+                    tabs = page.wait_for_selector('[role="tablist"]', timeout=10000)
+                    if tabs:
+                        print("Found tabs container")
+                        
+                        # Look for the People tab specifically
+                        people_tab = None
+                        selectors = [
+                            'a[href*="/search?q=meme%20coin&src=typed_query&f=user"]',
+                            '[role="tab"]:has-text("People")',
+                            'a:has-text("People")',
+                            'div[role="tab"]:has-text("People")'
+                        ]
+                        
+                        for selector in selectors:
+                            try:
+                                people_tab = page.wait_for_selector(selector, state='visible', timeout=5000)
+                                if people_tab:
+                                    print(f"Found People tab with selector: {selector}")
+                                    
+                                    # Give the page a moment to stabilize
+                                    time.sleep(2)
+                                    
+                                    # Click the People tab
+                                    people_tab.click()
+                                    print("Clicked People tab")
+                                    
+                                    # Wait for people results to appear
+                                    page.wait_for_selector('[data-testid="cellInnerDiv"]', timeout=10000)
+                                    print("People results loaded")
+                                    break
+                            except Exception as tab_error:
+                                print(f"Selector {selector} failed: {tab_error}")
+                                continue
+                        
+                        if not people_tab:
+                            print("Could not find People tab")
+                            # Print all available tabs for debugging
+                            tabs_text = tabs.evaluate('el => el.innerText')
+                            print(f"Available tabs: {tabs_text}")
+                    
+                except Exception as e:
+                    print(f"Error while trying to click People tab: {e}")
+                    # Get the current page content for debugging
+                    print("\nCurrent page elements:")
+                    elements = element_tree.get_clickable_elements()
+                    for elem in elements:
+                        print(elem['selector'])
 
             input('Press Enter to close connection...')
         except Exception as e:
