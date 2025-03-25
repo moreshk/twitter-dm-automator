@@ -13,6 +13,7 @@ def process_replies(page):
     """Process all replies in a post"""
     print("\nAnalyzing replies...")
     processed_replies = set()
+    processed_users = set()  # New set to track processed usernames
     
     while True:
         # Get all reply tweets
@@ -41,6 +42,15 @@ def process_replies(page):
                 processed_replies.add(reply['id'])
                 
                 if reply['username'] and reply['profileUrl']:
+                    # Extract handle to check if we've processed this user before
+                    handle = reply['username'].split('@')[-1].split('·')[0].strip()
+                    
+                    if handle in processed_users:
+                        print(f"\nSkipping already processed user: @{handle}")
+                        continue
+                        
+                    processed_users.add(handle)  # Add to processed users set
+                    
                     try:
                         # Open user profile in new tab
                         print(f"\nOpening profile for: {reply['username']}")
@@ -175,10 +185,10 @@ def process_replies(page):
                         print(f"Following: {'❌ No' if stats['notFollowing'] else '✅ Yes'}")
                         print(f"Mutuals: {stats['mutuals']}")
                         
-                        # Check if user has >2K followers, open DMs, not following them, and >5 mutuals
+                        # Check if user has >1K followers, open DMs, not following them, and >5 mutuals
                         mutuals_count = int(stats['mutuals'].split()[0]) if stats['mutuals'] != 'No mutual followers' else 0
                         
-                        if (stats['followersNum'] >= 2000 and 
+                        if (stats['followersNum'] >= 1000 and 
                             stats['dmOpen'] and 
                             stats['notFollowing'] and 
                             mutuals_count >= 5):
@@ -192,7 +202,7 @@ def process_replies(page):
                                 
                                 # Prepare message based on follower count
                                 message = ""
-                                if stats['followersNum'] >= 20000:
+                                if stats['followersNum'] >= 10000:
                                     message = f"""gm {profile_name}
 
 we're a new social launcher where you can tag us to launch tokens directly on the TL and earn 50% of the fees
