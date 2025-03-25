@@ -175,10 +175,16 @@ def process_replies(page):
                         print(f"Following: {'❌ No' if stats['notFollowing'] else '✅ Yes'}")
                         print(f"Mutuals: {stats['mutuals']}")
                         
-                        # Check if user has >10K followers, open DMs, and we're not following them
-                        if stats['followersNum'] >= 10000 and stats['dmOpen'] and stats['notFollowing']:
+                        # Check if user has >2K followers, open DMs, not following them, and >5 mutuals
+                        mutuals_count = int(stats['mutuals'].split()[0]) if stats['mutuals'] != 'No mutual followers' else 0
+                        
+                        if (stats['followersNum'] >= 2000 and 
+                            stats['dmOpen'] and 
+                            stats['notFollowing'] and 
+                            mutuals_count >= 5):
+                            
                             print(f"🎯 High Value Target! 🎯")
-                            print(f"✨ {stats['followers']} followers with open DMs ✨")
+                            print(f"✨ {stats['followers']} followers with open DMs and {mutuals_count} mutuals ✨")
                             
                             try:
                                 print("Opening DM...")
