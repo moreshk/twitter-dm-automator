@@ -14,6 +14,7 @@ def process_replies(page):
     print("\nAnalyzing replies...")
     processed_replies = set()
     processed_users = set()  # New set to track processed usernames
+    replies_processed = 0  # Counter for number of replies processed
     
     while True:
         # Get all reply tweets
@@ -50,8 +51,10 @@ def process_replies(page):
                         continue
                         
                     processed_users.add(handle)  # Add to processed users set
+                    replies_processed += 1  # Increment counter
                     
                     try:
+                        print(f"\nProcessing reply {replies_processed}/20")
                         # Open user profile in new tab
                         print(f"\nOpening profile for: {reply['username']}")
                         profile_page = page.context.new_page()
@@ -200,39 +203,63 @@ def process_replies(page):
                                 print("Opening DM...")
                                 random_delay(2, 4)  # Natural delay before clicking
                                 
-                                # Prepare message based on follower count
-                                message = ""
-                                if stats['followersNum'] >= 10000:
-                                    message = f"""gm {profile_name}
+                                # Click the DM button and wait for input with longer timeout
+                                profile_page.click('[data-testid="sendDMFromProfile"]')
+                                profile_page.wait_for_selector('[data-testid="dmComposerTextInput"]', timeout=60000)  # Increased to 60 seconds
+                                random_delay(2, 4)
+                                
+                                # Check for existing messages
+                                has_previous_messages = profile_page.evaluate('''
+                                    () => {
+                                        const messageEntries = document.querySelectorAll('[data-testid="messageEntry"]');
+                                        return messageEntries.length > 0;
+                                    }
+                                ''')
+                                
+                                # Prepare message based on conversation history
+                                if has_previous_messages:
+                                    message = f"gm {profile_name}"
+                                else:
+                                    base_message = f"""gm {profile_name}
 
-we're a new social launcher where you can tag us to launch tokens directly on the TL and earn 50% of the fees
+we're a new social launcher where you can tag us to launch tokens directly on the TL and earn 50% of the fees"""
+
+                                    if stats['followersNum'] >= 10000:
+                                        message = base_message + """
 
 got a prop for you:
 tag us to launch a token on your TL
 we'll give you 100% of the fees from your token
 + a heads up prior to our platform token launching
 can we collab?"""
-                                else:
-                                    message = f"""gm {profile_name}
-
-we're a new social launcher where you can tag us to launch tokens directly on the TL and earn 50% of the fees
+                                    else:
+                                        message = base_message + """
 
 hope you can check us out"""
                                 
-                                # Click the DM button and wait for input
-                                profile_page.click('[data-testid="sendDMFromProfile"]')
-                                profile_page.wait_for_selector('[data-testid="dmComposerTextInput"]', timeout=10000)
-                                random_delay(2, 4)
+                                # Type message with chunks for longer messages
+                                if stats['followersNum'] >= 10000:
+                                    # Split message into chunks and type with delays
+                                    message_chunks = message.split('\n\n')
+                                    for i, chunk in enumerate(message_chunks):
+                                        if i > 0:  # Add newlines back for all chunks except first
+                                            profile_page.keyboard.press('Enter')
+                                            profile_page.keyboard.press('Enter')
+                                            random_delay(1, 2)
+                                        profile_page.type('[data-testid="dmComposerTextInput"]', chunk, delay=100)
+                                        random_delay(2, 3)  # Delay between chunks
+                                else:
+                                    # For shorter messages, type as normal
+                                    profile_page.type('[data-testid="dmComposerTextInput"]', message, delay=100)
                                 
-                                # Type message
-                                profile_page.type('[data-testid="dmComposerTextInput"]', message, delay=100)
-                                random_delay(2, 3)
+                                random_delay(3, 5)  # Longer delay after typing
                                 
-                                # Click send and wait for completion
+                                # Click send with longer wait
                                 profile_page.click('[data-testid="dmComposerSendButton"]')
                                 print(f"Sent DM to {profile_name}:")
+                                print(f"{'(Follow-up message)' if has_previous_messages else '(First contact)'}")
                                 print(message)
-                                random_delay(4, 6)  # Longer delay after sending before closing
+                                random_delay(6, 8)  # Increased delay after sending before closing
                                 
                             except Exception as e:
                                 print(f"Error in DM process: {e}")
@@ -249,31 +276,19 @@ hope you can check us out"""
                         except:
                             pass
                     
+                    # Check if we've processed 20 replies
+                    if replies_processed >= 20:
+                        print("\nReached 20 replies limit. Moving to next viral post...")
+                        return
+                    
                     random_delay(1, 2)
         
-        if not new_replies:
-            # Scroll down to load more replies
-            page.evaluate("window.scrollBy(0, 800)")
-            random_delay(2, 3)
+        if not new_replies or replies_processed >= 20:
+            break
             
-            # Check if we've reached the end (look for "Show more replies" button)
-            show_more = page.query_selector('span:has-text("Show more replies")')
-            if show_more:
-                try:
-                    show_more.click()
-                    random_delay(2, 3)
-                except:
-                    break
-            else:
-                # Check if we're truly at the end
-                previous_height = page.evaluate("document.body.scrollHeight")
-                page.evaluate("window.scrollBy(0, 800)")
-                random_delay(2, 3)
-                new_height = page.evaluate("document.body.scrollHeight")
-                
-                if new_height == previous_height:
-                    print("\nReached end of replies")
-                    break
+        # Scroll down to load more replies if we haven't hit our limit
+        page.evaluate("window.scrollBy(0, 800)")
+        random_delay(2, 3)
 
 def main():
     with sync_playwright() as p:
@@ -284,8 +299,8 @@ def main():
             page = context.pages[0] if context.pages else context.new_page()
             
             # Set longer timeouts
-            page.set_default_timeout(60000)
-            page.set_default_navigation_timeout(60000)
+            page.set_default_timeout(120000)        # Increased to 120 seconds
+            page.set_default_navigation_timeout(120000)
 
             # Navigate to Twitter
             page.goto('https://twitter.com')
