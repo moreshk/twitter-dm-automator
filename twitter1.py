@@ -208,59 +208,87 @@ def process_replies(page):
                                 profile_page.wait_for_selector('[data-testid="dmComposerTextInput"]', timeout=60000)  # Increased to 60 seconds
                                 random_delay(2, 4)
                                 
-                                # Check for existing messages
-                                has_previous_messages = profile_page.evaluate('''
+                                # Check for existing messages and their timing
+                                message_check = profile_page.evaluate('''
                                     () => {
                                         const messageEntries = document.querySelectorAll('[data-testid="messageEntry"]');
-                                        return messageEntries.length > 0;
+                                        if (messageEntries.length === 0) {
+                                            return { hasMessages: false };
+                                        }
+                                        
+                                        // Get the last message's timestamp
+                                        const lastMessage = messageEntries[messageEntries.length - 1];
+                                        const timeElement = lastMessage.querySelector('time');
+                                        if (!timeElement) {
+                                            return { hasMessages: true, hoursSinceLastMessage: 0 };
+                                        }
+                                        
+                                        const messageTime = new Date(timeElement.getAttribute('datetime'));
+                                        const currentTime = new Date();
+                                        const hoursSinceLastMessage = (currentTime - messageTime) / (1000 * 60 * 60);
+                                        
+                                        return {
+                                            hasMessages: true,
+                                            hoursSinceLastMessage: hoursSinceLastMessage
+                                        };
                                     }
                                 ''')
                                 
-                                # Prepare message based on conversation history
-                                if has_previous_messages:
-                                    message = f"gm {profile_name}"
-                                else:
-                                    base_message = f"""gm {profile_name}
+                                # Determine if we should send a message
+                                should_send_message = True
+                                if message_check['hasMessages']:
+                                    if message_check['hoursSinceLastMessage'] < 24:
+                                        print(f"Last message was sent {message_check['hoursSinceLastMessage']:.1f} hours ago. Skipping.")
+                                        should_send_message = False
+                                    else:
+                                        print(f"Last message was sent {message_check['hoursSinceLastMessage']:.1f} hours ago. Sending follow-up.")
+                                
+                                if should_send_message:
+                                    # Prepare message based on conversation history
+                                    if message_check['hasMessages']:
+                                        message = f"gm {profile_name}"
+                                    else:
+                                        base_message = f"""gm {profile_name}
 
 we're a new social launcher where you can tag us to launch tokens directly on the TL and earn 50% of the fees"""
 
-                                    if stats['followersNum'] >= 10000:
-                                        message = base_message + """
+                                        if stats['followersNum'] >= 10000:
+                                            message = base_message + """
 
 got a prop for you:
 tag us to launch a token on your TL
 we'll give you 100% of the fees from your token
 + a heads up prior to our platform token launching
 can we collab?"""
-                                    else:
-                                        message = base_message + """
+                                        else:
+                                            message = base_message + """
 
 hope you can check us out"""
-                                
-                                # Type message with chunks for longer messages
-                                if stats['followersNum'] >= 10000:
-                                    # Split message into chunks and type with delays
-                                    message_chunks = message.split('\n\n')
-                                    for i, chunk in enumerate(message_chunks):
-                                        if i > 0:  # Add newlines back for all chunks except first
-                                            profile_page.keyboard.press('Enter')
-                                            profile_page.keyboard.press('Enter')
-                                            random_delay(1, 2)
-                                        profile_page.type('[data-testid="dmComposerTextInput"]', chunk, delay=100)
-                                        random_delay(2, 3)  # Delay between chunks
-                                else:
-                                    # For shorter messages, type as normal
-                                    profile_page.type('[data-testid="dmComposerTextInput"]', message, delay=100)
-                                
-                                random_delay(3, 5)  # Longer delay after typing
-                                
-                                # Click send with longer wait
-                                profile_page.click('[data-testid="dmComposerSendButton"]')
-                                print(f"Sent DM to {profile_name}:")
-                                print(f"{'(Follow-up message)' if has_previous_messages else '(First contact)'}")
-                                print(message)
-                                random_delay(6, 8)  # Increased delay after sending before closing
-                                
+                                    
+                                    # Type message with chunks for longer messages
+                                    if stats['followersNum'] >= 10000:
+                                        # Split message into chunks and type with delays
+                                        message_chunks = message.split('\n\n')
+                                        for i, chunk in enumerate(message_chunks):
+                                            if i > 0:  # Add newlines back for all chunks except first
+                                                profile_page.keyboard.press('Enter')
+                                                profile_page.keyboard.press('Enter')
+                                                random_delay(1, 2)
+                                            profile_page.type('[data-testid="dmComposerTextInput"]', chunk, delay=100)
+                                            random_delay(2, 3)  # Delay between chunks
+                                    else:
+                                        # For shorter messages, type as normal
+                                        profile_page.type('[data-testid="dmComposerTextInput"]', message, delay=100)
+                                    
+                                    random_delay(3, 5)  # Longer delay after typing
+                                    
+                                    # Click send with longer wait
+                                    profile_page.click('[data-testid="dmComposerSendButton"]')
+                                    print(f"Sent DM to {profile_name}:")
+                                    print(f"{'(Follow-up message)' if message_check['hasMessages'] else '(First contact)'}")
+                                    print(message)
+                                    random_delay(6, 8)  # Increased delay after sending before closing
+                                    
                             except Exception as e:
                                 print(f"Error in DM process: {e}")
                         
