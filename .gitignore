@@ -42,3 +42,4 @@ htmlcov/
 # Browser automation specific
 .playwright-cache/
 myenv/
+agent/
