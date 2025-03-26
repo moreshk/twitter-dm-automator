@@ -248,37 +248,26 @@ def process_replies(page):
                                     if message_check['hasMessages']:
                                         message = f"gm {profile_name}"
                                     else:
-                                        base_message = f"""gm {profile_name}
+                                        message = f"""gm {profile_name}
 
-we're a new social launcher where you can tag us to launch tokens directly on the TL and earn 50% of the fees"""
+We're an on-chain assistant that makes things happen directly on X.
 
-                                        if stats['followersNum'] >= 10000:
-                                            message = base_message + """
+Just tag us to:
+Send tokens to any handle on the TL
+Launch tokens & earn 50% of the fees
+Pick giveaway winners & send prizes instantly
 
-got a prop for you:
-tag us to launch a token on your TL
-we'll give you 100% of the fees from your token
-+ a heads up prior to our platform token launching
-can we collab?"""
-                                        else:
-                                            message = base_message + """
-
-hope you can check us out"""
+Hope you give us a try!"""
                                     
-                                    # Type message with chunks for longer messages
-                                    if stats['followersNum'] >= 10000:
-                                        # Split message into chunks and type with delays
-                                        message_chunks = message.split('\n\n')
-                                        for i, chunk in enumerate(message_chunks):
-                                            if i > 0:  # Add newlines back for all chunks except first
-                                                profile_page.keyboard.press('Enter')
-                                                profile_page.keyboard.press('Enter')
-                                                random_delay(1, 2)
-                                            profile_page.type('[data-testid="dmComposerTextInput"]', chunk, delay=100)
-                                            random_delay(2, 3)  # Delay between chunks
-                                    else:
-                                        # For shorter messages, type as normal
-                                        profile_page.type('[data-testid="dmComposerTextInput"]', message, delay=100)
+                                    # Type message with chunks
+                                    message_chunks = message.split('\n\n')
+                                    for i, chunk in enumerate(message_chunks):
+                                        if i > 0:  # Add newlines back for all chunks except first
+                                            profile_page.keyboard.press('Enter')
+                                            profile_page.keyboard.press('Enter')
+                                            random_delay(1, 2)
+                                        profile_page.type('[data-testid="dmComposerTextInput"]', chunk, delay=100)
+                                        random_delay(2, 3)  # Delay between chunks
                                     
                                     random_delay(3, 5)  # Longer delay after typing
                                     
