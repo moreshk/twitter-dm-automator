@@ -220,12 +220,22 @@ def process_replies(page):
                                         const lastMessage = messageEntries[messageEntries.length - 1];
                                         const timeElement = lastMessage.querySelector('time');
                                         if (!timeElement) {
-                                            return { hasMessages: true, hoursSinceLastMessage: 0 };
+                                            return { hasMessages: true, hoursSinceLastMessage: 24 }; // Default to 24 hours if no time found
                                         }
                                         
                                         const messageTime = new Date(timeElement.getAttribute('datetime'));
                                         const currentTime = new Date();
+                                        
+                                        // Ensure both dates are valid
+                                        if (isNaN(messageTime.getTime()) || isNaN(currentTime.getTime())) {
+                                            console.log('Invalid date detected');
+                                            return { hasMessages: true, hoursSinceLastMessage: 24 };
+                                        }
+                                        
                                         const hoursSinceLastMessage = (currentTime - messageTime) / (1000 * 60 * 60);
+                                        console.log('Message time:', messageTime);
+                                        console.log('Current time:', currentTime);
+                                        console.log('Hours since last message:', hoursSinceLastMessage);
                                         
                                         return {
                                             hasMessages: true,
