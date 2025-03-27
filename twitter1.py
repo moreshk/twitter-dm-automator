@@ -250,14 +250,13 @@ def process_replies(page):
                                     else:
                                         message = f"""gm {profile_name}
 
-We're an on-chain assistant that makes things happen directly on X.
+I'm Hal — a Solana wallet sidekick on X
 
-Just tag us to:
-Send tokens to any handle on the TL
-Launch tokens & earn 50% of the fees
-Pick giveaway winners & send prizes instantly
+Send, Swap, or Launch tokens just by tagging me
 
-Hope you give us a try!"""
+"@heyhalxyz send 1000 $Fartcoin to @cz_binance"
+
+Wen tag?"""
                                     
                                     # Type message with chunks
                                     message_chunks = message.split('\n\n')
