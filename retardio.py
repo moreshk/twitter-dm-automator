@@ -20,15 +20,15 @@ MESSAGE_BANK = [
     "new braindemic wave detected! what's your pick: ADHD or AUTISM?"
 ]
 
-def random_delay(min_seconds=2, max_seconds=4):
+def random_delay(min_seconds=5, max_seconds=8):
     """Add random delay to make actions look more human"""
     time.sleep(random.uniform(min_seconds, max_seconds))
 
 def type_human_like(page, selector, text):
     """Type text like a human with random delays between characters"""
     for char in text:
-        page.type(selector, char, delay=random.uniform(50, 150))
-        random_delay(0.1, 0.3)
+        page.type(selector, char, delay=random.uniform(150, 300))
+        random_delay(0.3, 0.6)
 
 def check_profile_metrics(page):
     """Check if profile meets our criteria"""
@@ -181,16 +181,16 @@ def main():
             # Click search box and search for retardio
             print("Searching for 'retardio'...")
             page.click('[data-testid="SearchBox_Search_Input"]')
-            random_delay(1, 2)
+            random_delay(2, 4)
             page.fill('[data-testid="SearchBox_Search_Input"]', 'retardio')
-            random_delay(1, 2)
+            random_delay(3, 5)
             page.keyboard.press('Enter')
-            random_delay(2, 3)
+            random_delay(4, 6)
 
             # Click People tab
             print("Switching to People tab...")
             page.click('span:text("People")')
-            random_delay(2, 3)
+            random_delay(4, 6)
 
             processed_users = set()
             while True:
@@ -212,17 +212,17 @@ def main():
 
                     processed_users.add(user_url)
                     print(f"\nChecking profile: {user_url}")
-                    random_delay(1, 2)  # Delay before opening new profile
+                    random_delay(3, 5)
 
                     # Open profile in new tab
                     profile_page = page.context.new_page()
-                    random_delay(1, 3)  # Delay after opening new tab
+                    random_delay(4, 6)
                     profile_page.goto(user_url)
-                    random_delay(2, 3)  # Delay after loading profile
+                    random_delay(4, 6)
 
                     # Check if profile meets criteria
                     meets_criteria, is_verified = check_profile_metrics(profile_page)
-                    random_delay(1, 2)  # Delay after checking metrics
+                    random_delay(3, 5)
                     
                     if meets_criteria:
                         username = profile_page.evaluate('''
@@ -234,64 +234,67 @@ def main():
                         
                         if not username:
                             print("Skipping - Unable to determine username")
-                            random_delay(1, 2)  # Delay before closing tab
+                            random_delay(1, 2)
                             profile_page.close()
-                            random_delay(1, 3)  # Delay after closing tab
+                            random_delay(1, 3)
                             continue
 
                         # Check if user was recently tagged
                         if was_recently_tagged(username):
                             print(f"Skipping @{username} - tagged within last 24 hours")
-                            random_delay(1, 2)  # Delay before closing tab
+                            random_delay(1, 2)
                             profile_page.close()
-                            random_delay(1, 3)  # Delay after closing tab
+                            random_delay(1, 3)
                             continue
 
                         print(f"Found qualifying user: @{username}")
-                        random_delay(1, 2)  # Delay before closing profile tab
+                        random_delay(1, 2)
                         profile_page.close()
-                        random_delay(2, 3)  # Delay after closing profile tab
+                        random_delay(2, 3)
+
+                        # Before posting, ensure at least 60 seconds have passed since last post
+                        random_delay(60, 75)
 
                         # Open post composer in new tab
                         print("Opening post composer...")
                         post_page = page.context.new_page()
-                        random_delay(1, 3)  # Delay after opening composer tab
+                        random_delay(1, 3)
                         post_page.goto('https://twitter.com/compose/tweet')
-                        random_delay(2, 3)  # Delay after loading composer
+                        random_delay(2, 3)
 
                         # Generate and type tweet
                         tweet_text = get_random_tweet_text(username)
                         if not tweet_text:
-                            random_delay(1, 2)  # Delay before closing tab
+                            random_delay(1, 2)
                             post_page.close()
-                            random_delay(1, 3)  # Delay after closing tab
+                            random_delay(1, 3)
                             continue
 
                         print(f"Posting tweet: {tweet_text}")
                         type_human_like(post_page, '[data-testid="tweetTextarea_0"]', tweet_text)
-                        random_delay(2, 3)  # Delay before clicking post
+                        random_delay(2, 3)
 
                         # Click post button
                         post_page.click('[data-testid="tweetButton"]')
-                        random_delay(2, 3)  # Delay after posting
+                        random_delay(2, 3)
                         post_page.close()
-                        random_delay(1, 3)  # Delay after closing post tab
+                        random_delay(1, 3)
 
                         # Record the tag
                         record_tagged_user(username, tweet_text)
                         print("Tweet posted successfully!")
-                        random_delay(2, 3)  # Delay before moving to next user
+                        random_delay(2, 3)
                     else:
                         print("Profile doesn't meet criteria, moving to next...")
-                        random_delay(1, 2)  # Delay before closing tab
+                        random_delay(1, 2)
                         profile_page.close()
-                        random_delay(1, 3)  # Delay after closing tab
+                        random_delay(1, 3)
 
-                    random_delay(2, 4)  # Additional delay between processing users
+                    random_delay(4, 6)
 
                 # Scroll down to load more results
                 page.evaluate("window.scrollBy(0, 800)")
-                random_delay(3, 4)  # Delay after scrolling
+                random_delay(4, 6)
 
         except Exception as e:
             print(f"Error occurred: {e}")
