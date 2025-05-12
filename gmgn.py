@@ -53,6 +53,18 @@ def main():
                             }
                             
                             return tokenRows.map(row => {
+                                // Get the full contract address from the row link
+                                let fullContractAddress = "";
+                                const tokenLinkElement = row.querySelector('a.css-1ahnstt');
+                                if (tokenLinkElement && tokenLinkElement.getAttribute('href')) {
+                                    const href = tokenLinkElement.getAttribute('href');
+                                    // Format is usually /sol/token/mintAddress
+                                    const parts = href.split('/');
+                                    if (parts.length > 0) {
+                                        fullContractAddress = parts[parts.length - 1];
+                                    }
+                                }
+                                
                                 // Extract token symbol - usually in a div with title attribute or bold text
                                 let tokenSymbol = "";
                                 const tokenNameElement = row.querySelector('.css-9enbzl');
@@ -141,11 +153,11 @@ def main():
                                     change1h = change1hElement.textContent.trim();
                                 }
                                 
-                                // Extract contract address
-                                let contractAddress = "";
+                                // Get the displayed abbreviated contract address
+                                let displayedAddress = "";
                                 const addressElement = row.querySelector('.css-vps9hc');
                                 if (addressElement) {
-                                    contractAddress = addressElement.textContent.trim();
+                                    displayedAddress = addressElement.textContent.trim();
                                 }
                                 
                                 // Get raw text for debugging
@@ -164,7 +176,8 @@ def main():
                                     change1m,
                                     change5m,
                                     change1h,
-                                    contractAddress,
+                                    contractAddress: fullContractAddress,
+                                    displayedAddress,
                                     rawText
                                 };
                             });
@@ -188,8 +201,21 @@ def main():
                                 token_info += f" (Age: {record['age']})"
                             print(token_info)
                             
-                            if record['contractAddress']:
-                                print(f"  Contract: {record['contractAddress']}")
+                            # Determine the contract address format
+                            contract = record['contractAddress']
+                            display = record['displayedAddress']
+                            
+                            # If the displayed address ends with "...ump", ensure full address does too
+                            if display and display.endswith("...ump") and contract:
+                                # Extract the suffix from displayed address
+                                if not contract.endswith("ump"):
+                                    contract = contract + "ump"
+                                print(f"  Contract: {contract}")
+                                print(f"  (Displayed as: {display})")
+                            else:
+                                print(f"  Contract: {contract}")
+                                if display and display != contract:
+                                    print(f"  (Displayed as: {display})")
                             
                             if record['solData']:
                                 print(f"  {record['solData']} {record['percentChange']}")
