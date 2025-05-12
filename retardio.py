@@ -162,144 +162,160 @@ def main():
     # Initialize database
     setup_database()
     
+    print("IMPORTANT: Before running this script, please start Chrome with remote debugging enabled.")
+    print("Run this command in a terminal first:")
+    print("For Mac: open -a \"Google Chrome\" --args --remote-debugging-port=9222")
+    print("For Windows: start chrome.exe --remote-debugging-port=9222")
+    print("For Linux: google-chrome --remote-debugging-port=9222")
+    print("Then run this script again.")
+    
     with sync_playwright() as p:
+        browser = None
         try:
             # Connect to existing Chrome instance
-            browser = p.chromium.connect_over_cdp("http://localhost:9222")
-            context = browser.contexts[0]
-            page = context.pages[0] if context.pages else context.new_page()
-            
-            # Set longer timeouts
-            page.set_default_timeout(60000)
-            page.set_default_navigation_timeout(60000)
+            print("Trying to connect to Chrome with remote debugging...")
+            try:
+                browser = p.chromium.connect_over_cdp("http://localhost:9222")
+                context = browser.contexts[0]
+                page = context.pages[0] if context.pages else context.new_page()
+                
+                # Set longer timeouts
+                page.set_default_timeout(60000)
+                page.set_default_navigation_timeout(60000)
+                
+                # Navigate to Twitter
+                print("Navigating to Twitter...")
+                page.goto('https://twitter.com')
+                random_delay()
 
-            # Navigate to Twitter
-            print("Navigating to Twitter...")
-            page.goto('https://twitter.com')
-            random_delay()
-
-            # Click search box and search for retardio
-            print("Searching for 'retardio'...")
-            page.click('[data-testid="SearchBox_Search_Input"]')
-            random_delay(2, 4)
-            page.fill('[data-testid="SearchBox_Search_Input"]', 'retardio')
-            random_delay(3, 5)
-            page.keyboard.press('Enter')
-            random_delay(4, 6)
-
-            # Click People tab
-            print("Switching to People tab...")
-            page.click('span:text("People")')
-            random_delay(4, 6)
-
-            processed_users = set()
-            while True:
-                # Get all user results
-                users = page.evaluate('''
-                    () => {
-                        const users = Array.from(document.querySelectorAll('[data-testid="cellInnerDiv"]'));
-                        return users.map(user => {
-                            const userLink = user.querySelector('a[href*="/status/"]') || 
-                                          user.querySelector('a[href*="/"]:not([href*="/status/"])');
-                            return userLink ? userLink.href : null;
-                        }).filter(href => href);
-                    }
-                ''')
-
-                for user_url in users:
-                    if user_url in processed_users:
-                        continue
-
-                    processed_users.add(user_url)
-                    print(f"\nChecking profile: {user_url}")
-                    random_delay(3, 5)
-
-                    # Open profile in new tab
-                    profile_page = page.context.new_page()
-                    random_delay(4, 6)
-                    profile_page.goto(user_url)
-                    random_delay(4, 6)
-
-                    # Check if profile meets criteria
-                    meets_criteria, is_verified = check_profile_metrics(profile_page)
-                    random_delay(3, 5)
-                    
-                    if meets_criteria:
-                        username = profile_page.evaluate('''
-                            () => {
-                                const element = document.querySelector('[data-testid="User-Name"]');
-                                return element ? element.textContent.split('@')[1].split('·')[0].trim() : null;
-                            }
-                        ''')
-                        
-                        if not username:
-                            print("Skipping - Unable to determine username")
-                            random_delay(1, 2)
-                            profile_page.close()
-                            random_delay(1, 3)
-                            continue
-
-                        # Check if user was recently tagged
-                        if was_recently_tagged(username):
-                            print(f"Skipping @{username} - tagged within last 24 hours")
-                            random_delay(1, 2)
-                            profile_page.close()
-                            random_delay(1, 3)
-                            continue
-
-                        print(f"Found qualifying user: @{username}")
-                        random_delay(1, 2)
-                        profile_page.close()
-                        random_delay(2, 3)
-
-                        # Before posting, ensure at least 60 seconds have passed since last post
-                        random_delay(60, 75)
-
-                        # Open post composer in new tab
-                        print("Opening post composer...")
-                        post_page = page.context.new_page()
-                        random_delay(1, 3)
-                        post_page.goto('https://twitter.com/compose/tweet')
-                        random_delay(2, 3)
-
-                        # Generate and type tweet
-                        tweet_text = get_random_tweet_text(username)
-                        if not tweet_text:
-                            random_delay(1, 2)
-                            post_page.close()
-                            random_delay(1, 3)
-                            continue
-
-                        print(f"Posting tweet: {tweet_text}")
-                        type_human_like(post_page, '[data-testid="tweetTextarea_0"]', tweet_text)
-                        random_delay(2, 3)
-
-                        # Click post button
-                        post_page.click('[data-testid="tweetButton"]')
-                        random_delay(2, 3)
-                        post_page.close()
-                        random_delay(1, 3)
-
-                        # Record the tag
-                        record_tagged_user(username, tweet_text)
-                        print("Tweet posted successfully!")
-                        random_delay(2, 3)
-                    else:
-                        print("Profile doesn't meet criteria, moving to next...")
-                        random_delay(1, 2)
-                        profile_page.close()
-                        random_delay(1, 3)
-
-                    random_delay(4, 6)
-
-                # Scroll down to load more results
-                page.evaluate("window.scrollBy(0, 800)")
+                # Click search box and search for retardio
+                print("Searching for 'retardio'...")
+                page.click('[data-testid="SearchBox_Search_Input"]')
+                random_delay(2, 4)
+                page.fill('[data-testid="SearchBox_Search_Input"]', 'retardio')
+                random_delay(3, 5)
+                page.keyboard.press('Enter')
                 random_delay(4, 6)
 
+                # Click People tab
+                print("Switching to People tab...")
+                page.click('span:text("People")')
+                random_delay(4, 6)
+
+                processed_users = set()
+                while True:
+                    # Get all user results
+                    users = page.evaluate('''
+                        () => {
+                            const users = Array.from(document.querySelectorAll('[data-testid="cellInnerDiv"]'));
+                            return users.map(user => {
+                                const userLink = user.querySelector('a[href*="/status/"]') || 
+                                              user.querySelector('a[href*="/"]:not([href*="/status/"])');
+                                return userLink ? userLink.href : null;
+                            }).filter(href => href);
+                        }
+                    ''')
+
+                    for user_url in users:
+                        if user_url in processed_users:
+                            continue
+
+                        processed_users.add(user_url)
+                        print(f"\nChecking profile: {user_url}")
+                        random_delay(3, 5)
+
+                        # Open profile in new tab
+                        profile_page = page.context.new_page()
+                        random_delay(4, 6)
+                        profile_page.goto(user_url)
+                        random_delay(4, 6)
+
+                        # Check if profile meets criteria
+                        meets_criteria, is_verified = check_profile_metrics(profile_page)
+                        random_delay(3, 5)
+                        
+                        if meets_criteria:
+                            username = profile_page.evaluate('''
+                                () => {
+                                    const element = document.querySelector('[data-testid="User-Name"]');
+                                    return element ? element.textContent.split('@')[1].split('·')[0].trim() : null;
+                                }
+                            ''')
+                            
+                            if not username:
+                                print("Skipping - Unable to determine username")
+                                random_delay(1, 2)
+                                profile_page.close()
+                                random_delay(1, 3)
+                                continue
+
+                            # Check if user was recently tagged
+                            if was_recently_tagged(username):
+                                print(f"Skipping @{username} - tagged within last 24 hours")
+                                random_delay(1, 2)
+                                profile_page.close()
+                                random_delay(1, 3)
+                                continue
+
+                            print(f"Found qualifying user: @{username}")
+                            random_delay(1, 2)
+                            profile_page.close()
+                            random_delay(2, 3)
+
+                            # Before posting, ensure at least 60 seconds have passed since last post
+                            random_delay(60, 75)
+
+                            # Open post composer in new tab
+                            print("Opening post composer...")
+                            post_page = page.context.new_page()
+                            random_delay(1, 3)
+                            post_page.goto('https://twitter.com/compose/tweet')
+                            random_delay(2, 3)
+
+                            # Generate and type tweet
+                            tweet_text = get_random_tweet_text(username)
+                            if not tweet_text:
+                                random_delay(1, 2)
+                                post_page.close()
+                                random_delay(1, 3)
+                                continue
+
+                            print(f"Posting tweet: {tweet_text}")
+                            type_human_like(post_page, '[data-testid="tweetTextarea_0"]', tweet_text)
+                            random_delay(2, 3)
+
+                            # Click post button
+                            post_page.click('[data-testid="tweetButton"]')
+                            random_delay(2, 3)
+                            post_page.close()
+                            random_delay(1, 3)
+
+                            # Record the tag
+                            record_tagged_user(username, tweet_text)
+                            print("Tweet posted successfully!")
+                            random_delay(2, 3)
+                        else:
+                            print("Profile doesn't meet criteria, moving to next...")
+                            random_delay(1, 2)
+                            profile_page.close()
+                            random_delay(1, 3)
+
+                        random_delay(4, 6)
+
+                    # Scroll down to load more results
+                    page.evaluate("window.scrollBy(0, 800)")
+                    random_delay(4, 6)
+
+            except Exception as connect_error:
+                print(f"Could not connect to Chrome: {connect_error}")
+                print("Please make sure Chrome is running with --remote-debugging-port=9222")
+                return
+            
         except Exception as e:
             print(f"Error occurred: {e}")
         finally:
-            browser.close()
+            if browser:
+                browser.close()
 
 if __name__ == '__main__':
     main() 

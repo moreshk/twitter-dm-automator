@@ -43,3 +43,4 @@ htmlcov/
 .playwright-cache/
 myenv/
 agent/
+~/
