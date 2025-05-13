@@ -1,12 +1,186 @@
 from playwright.sync_api import sync_playwright
 import time
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+import psycopg2
+import os
+from dotenv import load_dotenv
+
+def setup_database():
+    """Set up the PostgreSQL database connection using environment variables"""
+    # Load environment variables from .env file
+    load_dotenv()
+    
+    # Get database connection details from environment variables
+    conn = psycopg2.connect(
+        dbname=os.getenv("DB_NAME", "postgres"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", ""),
+        host=os.getenv("DB_HOST", "localhost"),
+        port=os.getenv("DB_PORT", "5432")
+    )
+    return conn
+
+def calculate_token_creation_time(age_text):
+    """Calculate token creation time from age text (e.g., '30s', '5m', '1h')"""
+    if not age_text:
+        return None
+        
+    try:
+        # Convert age text to seconds
+        seconds = 0
+        if 'm' in age_text:
+            seconds = int(age_text.replace('m', '')) * 60
+        elif 's' in age_text:
+            seconds = int(age_text.replace('s', ''))
+        elif 'h' in age_text:
+            seconds = int(age_text.replace('h', '')) * 3600
+        
+        if seconds > 0:
+            # Calculate creation time in UTC
+            creation_time = datetime.utcnow() - timedelta(seconds=seconds)
+            return creation_time
+        
+    except Exception as e:
+        print(f"Error parsing age data '{age_text}': {e}")
+    
+    return None
+
+def insert_or_update_token(conn, token_data):
+    """Insert a new token record or update if contract address already exists"""
+    cursor = conn.cursor()
+    
+    # Check if token already exists
+    cursor.execute("SELECT contract_address FROM pump_tokens WHERE contract_address = %s", 
+                  (token_data['contractAddress'],))
+    exists = cursor.fetchone()
+    
+    # Use UTC timestamps
+    current_time = datetime.utcnow()
+    
+    # Calculate token creation time from age
+    token_creation_time = calculate_token_creation_time(token_data['age'])
+    
+    if exists:
+        # Update existing record
+        cursor.execute('''
+        UPDATE pump_tokens SET 
+            token_symbol = %s,
+            price = %s,
+            liquidity = %s,
+            holders = %s,
+            transactions = %s,
+            volume = %s,
+            change_1m = %s,
+            change_5m = %s,
+            change_1h = %s,
+            sol_data = %s,
+            percent_change = %s,
+            updated_at = %s
+        WHERE contract_address = %s
+        ''', (
+            token_data['tokenSymbol'],
+            token_data['price'],
+            token_data['liquidity'],
+            token_data['holders'],
+            token_data['transactions'],
+            token_data['volume'],
+            token_data['change1m'],
+            token_data['change5m'],
+            token_data['change1h'],
+            token_data['solData'],
+            token_data['percentChange'],
+            current_time,
+            token_data['contractAddress']
+        ))
+        
+        # Only update token_creation_time if we can calculate it and it's not already set
+        if token_creation_time:
+            cursor.execute('''
+            UPDATE pump_tokens 
+            SET token_creation_time = %s 
+            WHERE contract_address = %s 
+            AND (token_creation_time IS NULL OR token_creation_time > %s)
+            ''', (
+                token_creation_time,
+                token_data['contractAddress'],
+                token_creation_time
+            ))
+    else:
+        # Insert new record
+        cursor.execute('''
+        INSERT INTO pump_tokens (
+            contract_address,
+            token_symbol,
+            price,
+            liquidity,
+            holders,
+            transactions,
+            volume,
+            change_1m,
+            change_5m,
+            change_1h,
+            sol_data,
+            percent_change,
+            created_at,
+            updated_at,
+            token_creation_time
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (
+            token_data['contractAddress'],
+            token_data['tokenSymbol'],
+            token_data['price'],
+            token_data['liquidity'],
+            token_data['holders'],
+            token_data['transactions'],
+            token_data['volume'],
+            token_data['change1m'],
+            token_data['change5m'],
+            token_data['change1h'],
+            token_data['solData'],
+            token_data['percentChange'],
+            current_time,
+            current_time,
+            token_creation_time
+        ))
+    
+    conn.commit()
+    return exists is not None
+
+def store_age_data(conn, token_symbol, age_text):
+    """Store the age data in a separate format for analysis"""
+    try:
+        # Convert age text (like '2m' or '30s') to seconds
+        seconds = 0
+        if 'm' in age_text:
+            seconds = int(age_text.replace('m', '')) * 60
+        elif 's' in age_text:
+            seconds = int(age_text.replace('s', ''))
+        elif 'h' in age_text:
+            seconds = int(age_text.replace('h', '')) * 3600
+        
+        if seconds > 0:
+            # Calculate discovery time
+            discovery_time = datetime.now() - datetime.timedelta(seconds=seconds)
+            
+            # Could store in a separate table if needed
+            # For now, we'll just print it
+            print(f"Token {token_symbol} was discovered at approximately {discovery_time}")
+            
+            return discovery_time
+    except Exception as e:
+        print(f"Error parsing age data: {e}")
+    
+    return None
 
 def main():
     print("Attempting to connect to Chrome with remote debugging...")
     
     gmgn_url = "https://gmgn.ai/new-pair?chain=sol&rd=0&ppa=0&ms=0&fb=0&bp=0&or=0&mo=0&ry=0&0ren=1&0fr=1&0mihc=10&0ihc=1&0mish=10&0ish=1&0miv=1&0iv=1&0mac=30m&0mim=5&0im=1"
+    
+    # Set up the database
+    conn = setup_database()
+    print("Database connection setup complete")
     
     with sync_playwright() as p:
         try:
@@ -189,16 +363,25 @@ def main():
                     ''')
                     
                     # Log the timestamp
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    current_time = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
                     print(f"\n--- Data extracted at {current_time} ---")
                     
-                    # Print the extracted data
+                    # Print the extracted data and store in database
                     if records and len(records) > 0:
                         print(f"Found {len(records)} token entries")
+                        new_tokens = 0
+                        updated_tokens = 0
+                        
                         for idx, record in enumerate(records):
                             token_info = f"Token #{idx+1}: {record['tokenSymbol']}"
                             if record['age']:
                                 token_info += f" (Age: {record['age']})"
+                                
+                                # Calculate and display token creation time
+                                creation_time = calculate_token_creation_time(record['age'])
+                                if creation_time:
+                                    token_info += f" [Created: {creation_time.strftime('%Y-%m-%d %H:%M:%S UTC')}]"
+                                    
                             print(token_info)
                             
                             # Determine the contract address format
@@ -216,6 +399,9 @@ def main():
                                 print(f"  Contract: {contract}")
                                 if display and display != contract:
                                     print(f"  (Displayed as: {display})")
+                            
+                            # Update contract address in record
+                            record['contractAddress'] = contract
                             
                             if record['solData']:
                                 print(f"  {record['solData']} {record['percentChange']}")
@@ -242,8 +428,18 @@ def main():
                             
                             if changes:
                                 print(f"  Changes: {' | '.join(changes)}")
+                                
+                            # Store in database
+                            if record['contractAddress']:
+                                was_updated = insert_or_update_token(conn, record)
+                                if was_updated:
+                                    updated_tokens += 1
+                                else:
+                                    new_tokens += 1
                             
                             print("")
+                            
+                        print(f"Database updated: {new_tokens} new tokens, {updated_tokens} updated tokens")
                     else:
                         print("No records found on page")
                         
@@ -282,6 +478,10 @@ def main():
             print("\nMake sure Chrome is running with remote debugging enabled:")
             print("Run this command first:")
             print("/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --user-data-dir=~/chrome-debug-profile --remote-debugging-port=9222 --no-first-run --no-default-browser-check")
+        finally:
+            # Close database connection
+            if conn:
+                conn.close()
 
 if __name__ == '__main__':
     main()
