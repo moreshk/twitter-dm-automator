@@ -204,7 +204,7 @@ def store_age_data(conn, token_symbol, age_text):
 def main():
     print("Attempting to connect to Chrome with remote debugging...")
     
-    gmgn_url = "https://gmgn.ai/new-pair?chain=sol&rd=0&ppa=0&ms=0&fb=0&bp=0&or=0&mo=0&ry=0&0ren=1&0fr=1&0mihc=50&0ihc=1&0mish=50&0ish=1&0miv=5&0iv=1&0mac=30m&0mim=5&0im=1&0mahc=0&0mair=20&0iir=1&0miir=0&0mam=25"
+    gmgn_url = "https://gmgn.ai/new-pair?chain=sol&rd=0&ppa=0&ms=0&fb=0&bp=0&or=0&mo=0&ry=0&0ren=1&0fr=1&0mihc=50&0ihc=1&0mish=50&0ish=1&0miv=5&0iv=1&0mac=30m&0mim=5&0im=1&0mahc=0"
     
     # Set up the database
     conn = setup_database()
@@ -369,71 +369,222 @@ def main():
                                 let top10Percentage = "";
                                 let insidersPercentage = "";
                                 
-                                // Extract NoMint, Blacklist, and Burnt (Yes/No values)
-                                try {
-                                    // Look for the Yes/No values in cells
-                                    const degenTexts = Array.from(row.querySelectorAll('*'))
-                                        .map(el => el.textContent ? el.textContent.trim() : '')
-                                        .filter(text => text === 'Yes' || text === 'No');
-                                        
-                                    // Based on the screenshots, the order is typically NoMint, Blacklist, Burnt
-                                    if (degenTexts.length >= 3) {
-                                        nomint = degenTexts[0]; 
-                                        blacklist = degenTexts[1];
-                                        burnt = degenTexts[2];
+                                // Look for NoMint field
+                                const nomintElement = row.querySelector('.nomint-field');
+                                if (nomintElement) {
+                                    nomint = nomintElement.textContent.trim();
+                                } else {
+                                    // Try to find it by looking for "NoMint" text followed by Yes/No
+                                    const nodeList = Array.from(row.querySelectorAll('*'));
+                                    for (const node of nodeList) {
+                                        if (node.textContent && node.textContent.includes('NoMint')) {
+                                            const siblingNode = node.nextElementSibling;
+                                            if (siblingNode && (siblingNode.textContent === "Yes" || siblingNode.textContent === "No")) {
+                                                nomint = siblingNode.textContent.trim();
+                                                break;
+                                            }
+                                        }
                                     }
-                                } catch (err) {
-                                    console.error("Error extracting Yes/No fields:", err);
                                 }
                                 
-                                // Extract Top 10 percentage and Insiders percentage
-                                try {
-                                    // Look for percentage values in the row
-                                    const percentageValues = Array.from(row.querySelectorAll('*'))
-                                        .map(el => el.textContent ? el.textContent.trim() : '')
-                                        .filter(text => text.match(/^\d+(\.\d+)?%$/));
+                                // Look for Blacklist field
+                                const blacklistElement = row.querySelector('.blacklist-field');
+                                if (blacklistElement) {
+                                    blacklist = blacklistElement.textContent.trim();
+                                } else {
+                                    // Try to find it by looking for "Blacklist" text followed by Yes/No
+                                    const nodeList = Array.from(row.querySelectorAll('*'));
+                                    for (const node of nodeList) {
+                                        if (node.textContent && node.textContent.includes('Blacklist')) {
+                                            const siblingNode = node.nextElementSibling;
+                                            if (siblingNode && (siblingNode.textContent === "Yes" || siblingNode.textContent === "No")) {
+                                                blacklist = siblingNode.textContent.trim();
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Look for Burnt field
+                                const burntElement = row.querySelector('.burnt-field');
+                                if (burntElement) {
+                                    burnt = burntElement.textContent.trim();
+                                } else {
+                                    // Try to find it by looking for "Burnt" text followed by Yes/No
+                                    const nodeList = Array.from(row.querySelectorAll('*'));
+                                    for (const node of nodeList) {
+                                        if (node.textContent && node.textContent.includes('Burnt')) {
+                                            const siblingNode = node.nextElementSibling;
+                                            if (siblingNode && (siblingNode.textContent === "Yes" || siblingNode.textContent === "No")) {
+                                                burnt = siblingNode.textContent.trim();
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Look for Top 10 percentage
+                                const top10Element = row.querySelector('.top10-field');
+                                if (top10Element) {
+                                    top10Percentage = top10Element.textContent.trim();
+                                } else {
+                                    // Try several methods to find the Top 10 percentage value
                                     
-                                    // According to screenshots, first non-zero percentage is Top 10
-                                    // and the 0% value is usually Insiders
-                                    for (const pct of percentageValues) {
-                                        if (pct !== '0%' && !top10Percentage) {
-                                            top10Percentage = pct;
-                                        } else if (pct === '0%') {
-                                            insidersPercentage = pct;
+                                    // Method 1: Look for the text after "Top 10" label
+                                    const nodeList = Array.from(row.querySelectorAll('*'));
+                                    for (const node of nodeList) {
+                                        if (node.textContent && node.textContent.includes('Top 10')) {
+                                            // Check the next sibling or nearby elements
+                                            const siblings = node.parentElement ? Array.from(node.parentElement.children) : [];
+                                            for (const sibling of siblings) {
+                                                if (sibling !== node && sibling.textContent && sibling.textContent.includes('%')) {
+                                                    top10Percentage = sibling.textContent.trim();
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            // If not found in siblings, try to extract from the element itself
+                                            if (!top10Percentage) {
+                                                const matches = node.parentElement ? node.parentElement.textContent.match(/Top 10\s+(\d+\.?\d*%)/i) : null;
+                                                if (matches && matches.length > 1) {
+                                                    top10Percentage = matches[1];
+                                                }
+                                            }
+                                            
+                                            if (top10Percentage) break;
                                         }
                                     }
-                                } catch (err) {
-                                    console.error("Error extracting percentage fields:", err);
-                                }
-                                
-                                // Fallback to direct cell content for Top 10 and Insiders
-                                if (!top10Percentage || !insidersPercentage) {
-                                    try {
-                                        // Get all cells in the row
-                                        const cells = row.querySelectorAll('.g-table-cell');
-                                        
-                                        // Based on the screenshots, Top 10 is in one of the later columns
-                                        // and Insiders is typically in the column after that
-                                        if (cells.length >= 11) { // Estimate based on column count
-                                            const top10CellIndex = 11; // Adjust if needed
-                                            const insidersCellIndex = 12; // Adjust if needed
-                                            
-                                            if (cells[top10CellIndex] && !top10Percentage) {
-                                                const cellText = cells[top10CellIndex].textContent.trim();
-                                                if (cellText.match(/^\d+(\.\d+)?%$/)) {
-                                                    top10Percentage = cellText;
-                                                }
+                                    
+                                    // Method 2: Extract from column values in a row
+                                    if (!top10Percentage) {
+                                        // Check for percentages that appear after Top 10 header
+                                        const columns = row.querySelectorAll('.g-table-cell');
+                                        columns.forEach((col, index) => {
+                                            const headers = document.querySelectorAll('.g-table-head .g-table-cell');
+                                            if (index < headers.length && headers[index] && 
+                                                headers[index].textContent && 
+                                                headers[index].textContent.includes('Top 10') &&
+                                                col.textContent && 
+                                                col.textContent.includes('%')) {
+                                                top10Percentage = col.textContent.trim();
                                             }
-                                            
-                                            if (cells[insidersCellIndex] && !insidersPercentage) {
-                                                const cellText = cells[insidersCellIndex].textContent.trim();
-                                                if (cellText === '0%') {
-                                                    insidersPercentage = cellText;
+                                        });
+                                    }
+                                    
+                                    // Method 3: Look for values directly in the table structure
+                                    if (!top10Percentage) {
+                                        // This specific format shown in screenshots (10.1%, 65.8%, etc.)
+                                        const percentageElements = row.querySelectorAll('*');
+                                        for (const el of percentageElements) {
+                                            const text = el.textContent;
+                                            if (text && /^\d+(\.\d+)?%$/.test(text.trim()) && 
+                                                !text.includes('0%')) { // Exclude Insiders 0%
+                                                const previousElement = el.previousElementSibling;
+                                                const parentText = el.parentElement ? el.parentElement.textContent : '';
+                                                
+                                                // Check if this is under Top 10 context and not under other percentage contexts
+                                                if ((previousElement && previousElement.textContent.includes('Top 10')) ||
+                                                    (parentText.includes('Top 10'))) {
+                                                    top10Percentage = text.trim();
+                                                    break;
+                                                }
+                                                
+                                                // Backup approach - if no other percentage found, take the first valid one
+                                                if (!top10Percentage && !parentText.includes('Insiders') && 
+                                                    !parentText.includes('1m%') && !parentText.includes('5m%') && 
+                                                    !parentText.includes('1h%')) {
+                                                    top10Percentage = text.trim();
                                                 }
                                             }
                                         }
-                                    } catch (err) {
-                                        console.error("Error extracting from cells:", err);
+                                    }
+                                }
+                                
+                                // Look for Insiders percentage
+                                const insidersElement = row.querySelector('.insiders-field');
+                                if (insidersElement) {
+                                    insidersPercentage = insidersElement.textContent.trim();
+                                } else {
+                                    // Try several methods to find the Insiders percentage
+                                    
+                                    // Method 1: Look for the text after "Insiders" label
+                                    const nodeList = Array.from(row.querySelectorAll('*'));
+                                    for (const node of nodeList) {
+                                        if (node.textContent && node.textContent.includes('Insiders')) {
+                                            // Check the next sibling or nearby elements
+                                            const siblings = node.parentElement ? Array.from(node.parentElement.children) : [];
+                                            for (const sibling of siblings) {
+                                                if (sibling !== node && sibling.textContent && sibling.textContent.includes('%')) {
+                                                    insidersPercentage = sibling.textContent.trim();
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            // If not found in siblings, try to extract from the element itself
+                                            if (!insidersPercentage) {
+                                                const matches = node.parentElement ? node.parentElement.textContent.match(/Insiders\s+(\d+\.?\d*%)/i) : null;
+                                                if (matches && matches.length > 1) {
+                                                    insidersPercentage = matches[1];
+                                                }
+                                            }
+                                            
+                                            if (insidersPercentage) break;
+                                        }
+                                    }
+                                    
+                                    // Method 2: Extract from column values in a row
+                                    if (!insidersPercentage) {
+                                        // Check for percentages that appear after Insiders header
+                                        const columns = row.querySelectorAll('.g-table-cell');
+                                        columns.forEach((col, index) => {
+                                            const headers = document.querySelectorAll('.g-table-head .g-table-cell');
+                                            if (index < headers.length && headers[index] && 
+                                                headers[index].textContent && 
+                                                headers[index].textContent.includes('Insiders') &&
+                                                col.textContent) {
+                                                insidersPercentage = col.textContent.trim();
+                                            }
+                                        });
+                                    }
+                                    
+                                    // Method 3: Look for specific "0%" values in the context of Insiders
+                                    if (!insidersPercentage) {
+                                        const percentageElements = row.querySelectorAll('*');
+                                        for (const el of percentageElements) {
+                                            const text = el.textContent;
+                                            // Looking for the 0% after Insiders
+                                            if (text && text.trim() === '0%') {
+                                                const previousElement = el.previousElementSibling;
+                                                const parentText = el.parentElement ? el.parentElement.textContent : '';
+                                                
+                                                // Check if this is under Insiders context
+                                                if ((previousElement && previousElement.textContent.includes('Insiders')) ||
+                                                    (parentText.includes('Insiders'))) {
+                                                    insidersPercentage = text.trim();
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Method 4: Direct DOM proximity approach - look for "0%" text appearing after an "Insiders" element
+                                    if (!insidersPercentage) {
+                                        const insiderHeaders = Array.from(row.querySelectorAll('*')).filter(el => 
+                                            el.textContent && el.textContent.trim() === 'Insiders');
+                                            
+                                        for (const header of insiderHeaders) {
+                                            // Look at position in DOM to find the next elements
+                                            let current = header;
+                                            while (current && current.nextElementSibling) {
+                                                current = current.nextElementSibling;
+                                                if (current.textContent && current.textContent.trim() === '0%') {
+                                                    insidersPercentage = '0%';
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            if (insidersPercentage) break;
+                                        }
                                     }
                                 }
                                 
@@ -462,20 +613,6 @@ def main():
                                 
                                 // Get raw text for debugging
                                 const rawText = row.textContent.trim().substring(0, 200);
-                                
-                                // Log what we found for debugging
-                                console.log("Degen Audit extraction results:");
-                                console.log("- NoMint:", nomint);
-                                console.log("- Blacklist:", blacklist);
-                                console.log("- Burnt:", burnt);
-                                console.log("- Top 10%:", top10Percentage);
-                                console.log("- Insiders%:", insidersPercentage);
-                                
-                                // Log all percentage values found in the row for debugging
-                                const allTexts = Array.from(row.querySelectorAll('*'))
-                                    .map(el => el.textContent ? el.textContent.trim() : '')
-                                    .filter(text => text.match(/^(\d+(\.\d+)?%)$/) || text === 'Yes' || text === 'No');
-                                console.log("All percentage/Yes/No values found:", allTexts);
                                 
                                 return {
                                     tokenSymbol,
